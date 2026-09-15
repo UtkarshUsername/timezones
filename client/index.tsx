@@ -1,171 +1,82 @@
-import { canAccessApp, createClient, getIdentity, Link, retryAuth, Route, Router, Routes, SignInWithGoogle, signOut, useAuth } from "lakebed/client";
-import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
-import type app from "../server";
-import { cleanTodoText } from "../shared/todo";
+import { useEffect, useMemo, useState } from "preact/hooks";
 
-const client = createClient<typeof app>();
+type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string };
 
-function AuthAvatar({ label, picture }: { label: string; picture?: string }) {
-  const initial = label.trim().slice(0, 1).toUpperCase() || "?";
+const STORAGE_KEY = "timezones-planner-v1";
+const zoneOptions = [
+  "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Helsinki", "Africa/Johannesburg", "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul", "Australia/Perth", "Australia/Sydney", "Pacific/Auckland"
+];
 
-  if (picture) {
-    return (
-      <img
-        alt=""
-        className="h-7 w-7 shrink-0 rounded-full border border-neutral-800 bg-neutral-900 object-cover"
-        referrerPolicy="no-referrer"
-        src={picture}
-      />
-    );
-  }
-
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-neutral-800 bg-neutral-900 text-xs font-medium text-neutral-300"
-    >
-      {initial}
-    </span>
-  );
+function localDate() { return new Date().toLocaleDateString("en-CA"); }
+function initialState(): SavedState {
+  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  return { zones: [detected], sourceZone: detected, date: localDate(), start: "09:00", end: "10:00" };
 }
-
-function TodoPage() {
-  const todos = client.useQuery("todos");
-  const addTodo = client.useMutation("addTodo");
-
-  async function onSubmit(event: SubmitEvent) {
-    event.preventDefault();
-    const form = event.currentTarget as HTMLFormElement;
-    const data = new FormData(form);
-    const text = cleanTodoText(String(data.get("text") ?? ""));
-    if (!text) {
-      return;
-    }
-
-    await addTodo(text);
-    form.reset();
-  }
-
-  return (
-    <section>
-      <h1 className="mb-8 text-5xl font-bold tracking-tight">{ "timezones" }</h1>
-      <form className="mb-8 flex gap-3" onSubmit={(event) => void onSubmit(event)}>
-        <input className="min-w-0 flex-1 border border-neutral-700 bg-black px-3 py-2 text-white outline-none focus:border-white" name="text" placeholder="Add a todo" />
-        <button className="border border-white px-4 py-2 font-medium" type="submit">Add</button>
-      </form>
-      <ul className="divide-y divide-neutral-800 border-y border-neutral-800">
-        {(todos ?? []).map((todo) => (
-          <li className="py-3" key={todo.id}>{todo.text}</li>
-        ))}
-      </ul>
-    </section>
-  );
+function loadState(): SavedState {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "") as Partial<SavedState>;
+    if (Array.isArray(saved.zones) && saved.zones.length && saved.sourceZone && saved.date && saved.start && saved.end) return saved as SavedState;
+  } catch { /* Invalid local data should not stop the planner. */ }
+  return initialState();
 }
-
-function StatusPage() {
-  const [status, setStatus] = useState("not checked");
-
-  async function checkStatus() {
-    const token = getIdentity().token;
-    const response = await fetch("api/status", {
-      headers: token ? { "X-Lakebed-Token": token } : {}
-    });
-    setStatus(response.ok ? await response.text() : "error " + response.status);
-  }
-
-  return (
-    <section>
-      <h1 className="mb-4 text-4xl font-bold tracking-tight">Status</h1>
-      <p className="mb-6 text-neutral-400">This route calls the server endpoint at /api/status.</p>
-      <button className="border border-white px-4 py-2 font-medium" type="button" onClick={() => void checkStatus()}>
-        Check endpoint
-      </button>
-      <p className="mt-4 font-mono text-sm text-neutral-400">endpoint: {status}</p>
-    </section>
-  );
+function displayZone(zone: string) { return zone.replaceAll("_", " ").replaceAll("/", " · "); }
+function shortZone(zone: string) { return zone.split("/").at(-1)?.replaceAll("_", " ") || zone; }
+function formatInZone(timestamp: number, zone: string, options: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...options }).format(timestamp);
 }
+function offsetMinutes(timestamp: number, zone: string) {
+  const part = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(timestamp).find((item) => item.type === "timeZoneName")?.value || "GMT";
+  const match = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+  if (!match) return 0;
+  const minutes = Number(match[2]) * 60 + Number(match[3] || 0);
+  return match[1] === "+" ? minutes : -minutes;
+}
+function zonedTimestamp(date: string, time: string, zone: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hours, minutes] = time.split(":").map(Number);
+  const wallTime = Date.UTC(year, month - 1, day, hours, minutes);
+  let timestamp = wallTime - offsetMinutes(wallTime, zone) * 60_000;
+  timestamp = wallTime - offsetMinutes(timestamp, zone) * 60_000;
+  return timestamp;
+}
+function rangeEnd(start: number, end: number) { return end > start ? end : end + 86_400_000; }
+function hourLabel(value: number) { return String(value).padStart(2, "0"); }
 
-function SessionGate({ children }: { children: ComponentChildren }) {
-  const auth = useAuth();
-  if (auth.isLoading) {
-    return <p>Checking session</p>;
-  }
-  if (canAccessApp()) {
-    return <>{children}</>;
-  }
-  return (
-    <section>
-      {auth.error ? <p role="alert">{auth.error}</p> : <p>Sign in to use this app.</p>}
-      <div className="mt-4 flex flex-wrap gap-3">
-        {auth.error ? (
-          <button className="border border-white px-4 py-2" type="button" onClick={() => void retryAuth()}>
-            Retry
-          </button>
-        ) : null}
-        <SignInWithGoogle className="border border-white px-4 py-2" />
-        {!auth.requireSignIn && auth.userId === null ? (
-          <button
-            className="border border-white px-4 py-2"
-            type="button"
-            onClick={() => {
-              if (window.confirm("Start a new guest session? Guest data that has not moved to an account stays inaccessible.")) {
-                void signOut();
-              }
-            }}
-          >
-            Start a new guest session
-          </button>
-        ) : null}
-      </div>
-    </section>
-  );
+function Timeline({ zone, date, selectedStart, selectedEnd }: { zone: string; date: string; selectedStart: number; selectedEnd: number }) {
+  const cells = Array.from({ length: 24 }, (_, hour) => {
+    const cellStart = zonedTimestamp(date, `${hourLabel(hour)}:00`, zone);
+    const cellEnd = zonedTimestamp(date, `${hourLabel((hour + 1) % 24)}:00`, zone) + (hour === 23 ? 86_400_000 : 0);
+    return { hour, active: cellStart < selectedEnd && cellEnd > selectedStart };
+  });
+  return <div className="relative"><div className="grid grid-cols-24 overflow-hidden rounded-sm border border-stone-300 bg-stone-100">{cells.map(({ hour, active }) => <div aria-label={`${hourLabel(hour)}:00${active ? ", selected" : ""}`} className={`h-12 border-r border-stone-300 last:border-r-0 ${active ? "bg-orange-500" : hour < 7 || hour > 20 ? "bg-slate-800" : "bg-stone-100"}`} key={hour} />)}</div><div className="grid grid-cols-6 pt-1 text-[10px] font-semibold tracking-[0.12em] text-slate-500">{["00", "04", "08", "12", "16", "20"].map((hour) => <span key={hour}>{hour}</span>)}</div></div>;
 }
 
 export function App() {
-  const auth = useAuth();
-  const authLabel = auth.displayName;
-  const authStatus = auth.isLoading
-    ? "Checking session"
-    : auth.isSignedIn
-      ? "Signed in as " + authLabel
-      : auth.isGuest
-        ? "Using this browser"
-        : "Signed out";
-
-  return (
-    <Router>
-      <main className="min-h-screen bg-black px-6 py-10 text-white">
-        <section className="mx-auto max-w-2xl">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              {auth.isSignedIn ? <AuthAvatar label={authLabel} picture={auth.picture} /> : null}
-              <p className="min-w-0 truncate font-mono text-sm">{authStatus}</p>
-            </div>
-            {auth.isSignedIn ? (
-              <button className="shrink-0 text-sm text-neutral-400 hover:text-white" type="button" onClick={() => void signOut()}>
-                Sign out
-              </button>
-            ) : auth.isGuest ? (
-              <SignInWithGoogle className="shrink-0 border border-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:border-white hover:text-white" />
-            ) : null}
-          </div>
-          {auth.isGuest ? (
-            <p className="mb-6 text-sm">Sign in to keep your todos. Clearing browser data ends guest access.</p>
-          ) : null}
-          <nav className="mb-8 flex gap-4 text-sm text-neutral-400">
-            <Link className="hover:text-white" to="/">Todos</Link>
-            <Link className="hover:text-white" to="/status">Status</Link>
-          </nav>
-          <SessionGate>
-            <Routes>
-              <Route path="/" element={<TodoPage />} />
-              <Route path="/status" element={<StatusPage />} />
-              <Route path="*" element={<section><h1 className="mb-4 text-4xl font-bold">Not found</h1><Link className="text-neutral-300 hover:text-white" to="/">Back to todos</Link></section>} />
-            </Routes>
-          </SessionGate>
-        </section>
-      </main>
-    </Router>
-  );
+  const [planner, setPlanner] = useState<SavedState>(initialState);
+  const [ready, setReady] = useState(false);
+  const [zoneInput, setZoneInput] = useState("");
+  useEffect(() => { setPlanner(loadState()); setReady(true); }, []);
+  useEffect(() => { if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(planner)); }, [planner, ready]);
+  const selectedRange = useMemo(() => {
+    const start = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
+    return { start, end: rangeEnd(start, zonedTimestamp(planner.date, planner.end, planner.sourceZone)) };
+  }, [planner.date, planner.end, planner.sourceZone, planner.start]);
+  function update(values: Partial<SavedState>) { setPlanner((current) => ({ ...current, ...values })); }
+  function addZone(event: SubmitEvent) {
+    event.preventDefault(); const zone = zoneInput.trim();
+    if (!zoneOptions.includes(zone) || planner.zones.includes(zone)) return;
+    update({ zones: [...planner.zones, zone] }); setZoneInput("");
+  }
+  function removeZone(zone: string) {
+    if (planner.zones.length === 1) return;
+    const zones = planner.zones.filter((item) => item !== zone);
+    update({ zones, sourceZone: planner.sourceZone === zone ? zones[0] : planner.sourceZone });
+  }
+  const sourceDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "long", day: "numeric", month: "short" });
+  return <main className="min-h-screen overflow-x-hidden bg-[#f3efe6] px-4 py-6 text-slate-950 sm:px-8 sm:py-10"><div className="mx-auto max-w-6xl">
+    <header className="mb-10 flex flex-col justify-between gap-6 border-b-2 border-slate-950 pb-6 sm:flex-row sm:items-end"><div><p className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.22em] text-orange-700">Local time collaborator</p><h1 className="font-serif text-5xl leading-none tracking-tight sm:text-7xl">Across the<br /><i>hours.</i></h1></div><p className="max-w-xs text-sm leading-6 text-slate-600">Pick a moment in one city. See where it lands for everyone else.</p></header>
+    <section className="mb-8 grid gap-px overflow-hidden border border-slate-950 bg-slate-950 sm:grid-cols-[1.2fr_0.8fr]"><div className="bg-[#f9f7f1] p-5 sm:p-7"><p className="mb-5 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Your reference</p><div className="grid gap-5 sm:grid-cols-2"><label className="text-sm font-semibold">Timezone<select className="mt-2 block w-full border-b-2 border-slate-950 bg-transparent py-2 font-mono text-base outline-none" value={planner.sourceZone} onChange={(event) => update({ sourceZone: event.currentTarget.value })}>{planner.zones.map((zone) => <option key={zone} value={zone}>{displayZone(zone)}</option>)}</select></label><label className="text-sm font-semibold">Date<input className="mt-2 block w-full border-b-2 border-slate-950 bg-transparent py-2 font-mono text-base outline-none" type="date" value={planner.date} onInput={(event) => update({ date: event.currentTarget.value })} /></label><label className="text-sm font-semibold">From<input className="mt-2 block w-full border-b-2 border-slate-950 bg-transparent py-2 font-mono text-base outline-none" type="time" step="900" value={planner.start} onInput={(event) => update({ start: event.currentTarget.value })} /></label><label className="text-sm font-semibold">Until<input className="mt-2 block w-full border-b-2 border-slate-950 bg-transparent py-2 font-mono text-base outline-none" type="time" step="900" value={planner.end} onInput={(event) => update({ end: event.currentTarget.value })} /></label></div></div><aside className="bg-orange-500 p-5 sm:p-7"><p className="mb-7 text-xs font-bold uppercase tracking-[0.16em] text-orange-950">Selected window</p><p className="font-mono text-3xl font-bold tracking-tight">{planner.start}–{planner.end}</p><p className="mt-2 text-sm font-semibold text-orange-950">{sourceDate}<br />{shortZone(planner.sourceZone)}</p><p className="mt-7 border-t border-orange-800 pt-3 text-xs leading-5 text-orange-950">Orange marks the same real-world range in every timezone. Dark blocks are local night.</p></aside></section>
+    <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time map</p><h2 className="mt-1 font-serif text-3xl">All 24 hours</h2></div><form className="flex gap-2" onSubmit={addZone}><input className="min-w-0 border-b-2 border-slate-950 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-slate-500" list="timezones" placeholder="Add a timezone" value={zoneInput} onInput={(event) => setZoneInput(event.currentTarget.value)} /><datalist id="timezones">{zoneOptions.map((zone) => <option key={zone} value={zone}>{displayZone(zone)}</option>)}</datalist><button className="bg-slate-950 px-4 py-2 text-sm font-bold text-[#f9f7f1] transition hover:bg-orange-700" type="submit">Add</button></form></section>
+    <section className="space-y-4">{planner.zones.map((zone) => <article className="grid gap-4 border-t border-slate-400 py-5 sm:grid-cols-[180px_1fr] sm:gap-7" key={zone}><div className="flex justify-between gap-3 sm:block"><div><p className="font-serif text-2xl leading-none">{shortZone(zone)}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{zone}</p><p className="mt-4 font-mono text-sm font-bold">{formatInZone(selectedRange.start, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })} <span className="font-normal text-slate-500">at start</span></p></div>{planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="h-fit text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-orange-700" onClick={() => removeZone(zone)} type="button">Remove</button> : null}</div><Timeline date={planner.date} selectedEnd={selectedRange.end} selectedStart={selectedRange.start} zone={zone} /></article>)}</section>
+  </div></main>;
 }
