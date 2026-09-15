@@ -55,7 +55,7 @@ function zoneMeta(date: string, zone: string) {
   const timestamp = zonedTimestamp(date, "12:00", zone);
   const code = zoneCode(timestamp, zone).replace("-", "−");
   const offset = gmtOffset(timestamp, zone);
-  return code === offset ? offset : `${code} · ${offset}`;
+  return code === offset ? `(${offset})` : `(${code} / ${offset})`;
 }
 function rangeEnd(start: number, end: number) { return end > start ? end : end + 86_400_000; }
 function hourLabel(value: number) { return String(value).padStart(2, "0"); }
