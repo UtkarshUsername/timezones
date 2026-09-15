@@ -5,7 +5,7 @@ type SavedState = { zones: string[]; sourceZone: string; date: string; start: st
 const STORAGE_KEY = "timezones-planner-v1";
 const zoneOptions = [
   "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Helsinki", "Africa/Johannesburg", "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul", "Australia/Perth", "Australia/Sydney", "Pacific/Auckland"
-];
+].sort((first, second) => shortZone(first).localeCompare(shortZone(second)));
 
 function localDate() { return new Date().toLocaleDateString("en-CA"); }
 function initialState(): SavedState {
