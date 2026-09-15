@@ -24,6 +24,10 @@ function shortZone(zone: string) { return zone.split("/").at(-1)?.replaceAll("_"
 function formatInZone(timestamp: number, zone: string, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...options }).format(timestamp);
 }
+function zoneCode(timestamp: number, zone: string) {
+  if (zone === "Asia/Kolkata" || zone === "Asia/Calcutta") return "IST";
+  return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(timestamp).find((item) => item.type === "timeZoneName")?.value || "GMT";
+}
 function offsetMinutes(timestamp: number, zone: string) {
   const part = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(timestamp).find((item) => item.type === "timeZoneName")?.value || "GMT";
   const match = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
@@ -38,6 +42,20 @@ function zonedTimestamp(date: string, time: string, zone: string) {
   let timestamp = wallTime - offsetMinutes(wallTime, zone) * 60_000;
   timestamp = wallTime - offsetMinutes(timestamp, zone) * 60_000;
   return timestamp;
+}
+function gmtOffset(timestamp: number, zone: string) {
+  const minutes = offsetMinutes(timestamp, zone);
+  const sign = minutes < 0 ? "−" : "+";
+  const absolute = Math.abs(minutes);
+  const hours = Math.floor(absolute / 60);
+  const remainder = absolute % 60;
+  return `GMT${sign}${hours}${remainder ? `:${hourLabel(remainder)}` : ""}`;
+}
+function zoneMeta(date: string, zone: string) {
+  const timestamp = zonedTimestamp(date, "12:00", zone);
+  const code = zoneCode(timestamp, zone).replace("-", "−");
+  const offset = gmtOffset(timestamp, zone);
+  return code === offset ? offset : `${code} · ${offset}`;
 }
 function rangeEnd(start: number, end: number) { return end > start ? end : end + 86_400_000; }
 function hourLabel(value: number) { return String(value).padStart(2, "0"); }
@@ -97,7 +115,7 @@ export function App() {
   const sourceDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "long", day: "numeric", month: "short" });
   return <main className="min-h-screen overflow-x-hidden bg-[#f3efe6] px-4 py-6 text-slate-950 sm:px-8 sm:py-10"><div className="mx-auto max-w-6xl">
     <header className="mb-10 flex flex-col justify-between gap-6 border-b-2 border-slate-950 pb-6 sm:flex-row sm:items-end"><div><p className="mb-3 font-mono text-xs font-bold uppercase tracking-[0.22em] text-orange-700">Local time collaborator</p><h1 className="font-serif text-5xl leading-none tracking-tight sm:text-7xl">Across the<br /><i>hours.</i></h1></div><p className="max-w-xs text-sm leading-6 text-slate-600">Pick a moment in one city. See where it lands for everyone else.</p></header>
-    <section className="mb-7 flex flex-col justify-between gap-5 border-y border-slate-400 py-4 sm:flex-row sm:items-center"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time map</p><h2 className="mt-1 font-serif text-3xl">Tap or drag a grid</h2></div><div className="flex flex-wrap items-center gap-5"><label className="text-sm font-semibold">Date<input className="ml-3 border-b-2 border-slate-950 bg-transparent py-1 font-mono text-sm outline-none" type="date" value={planner.date} onInput={(event) => update({ date: event.currentTarget.value })} /></label><p className="border-l-2 border-orange-500 pl-4 font-mono text-sm"><b>{planner.start}–{planner.end}</b> in {shortZone(planner.sourceZone)}<br /><span className="text-xs text-slate-500">{sourceDate}</span></p><form className="flex gap-2" onSubmit={addZone}><input className="min-w-0 border-b-2 border-slate-950 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-slate-500" list="timezones" placeholder="Add a timezone" value={zoneInput} onInput={(event) => setZoneInput(event.currentTarget.value)} /><datalist id="timezones">{zoneOptions.map((zone) => <option key={zone} value={zone}>{displayZone(zone)}</option>)}</datalist><button className="bg-slate-950 px-4 py-2 text-sm font-bold text-[#f9f7f1] transition hover:bg-orange-700" type="submit">Add</button></form></div></section>
-    <section className="space-y-4">{planner.zones.map((zone) => <article className="grid gap-4 border-t border-slate-400 py-5 sm:grid-cols-[180px_1fr] sm:gap-7" key={zone}><div className="flex justify-between gap-3 sm:block"><div><p className="font-serif text-2xl leading-none">{shortZone(zone)}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{zone}</p><p className="mt-4 font-mono text-sm font-bold">{formatInZone(selectedRange.start, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })} <span className="font-normal text-slate-500">at start</span></p></div>{planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="h-fit text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-orange-700" onClick={() => removeZone(zone)} type="button">Remove</button> : null}</div><Timeline date={planner.date} onSelect={selectRange} selectedEnd={selectedRange.end} selectedStart={selectedRange.start} zone={zone} /></article>)}</section>
+    <section className="mb-7 flex flex-col justify-between gap-5 border-y border-slate-400 py-4 sm:flex-row sm:items-center"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Time map</p><h2 className="mt-1 font-serif text-3xl">Tap or drag a grid</h2></div><div className="flex flex-wrap items-center gap-5"><label className="text-sm font-semibold">Date<input className="ml-3 border-b-2 border-slate-950 bg-transparent py-1 font-mono text-sm outline-none" type="date" value={planner.date} onInput={(event) => update({ date: event.currentTarget.value })} /></label><p className="border-l-2 border-orange-500 pl-4 font-mono text-sm"><b>{planner.start}–{planner.end}</b> in {shortZone(planner.sourceZone)}<br /><span className="text-xs text-slate-500">{zoneMeta(planner.date, planner.sourceZone)} · {sourceDate}</span></p><form className="flex gap-2" onSubmit={addZone}><select aria-label="Timezone to add" className="min-w-0 border-b-2 border-slate-950 bg-transparent px-1 py-2 text-sm outline-none" value={zoneInput} onChange={(event) => setZoneInput(event.currentTarget.value)}><option value="">Add a timezone</option>{zoneOptions.map((zone) => <option disabled={planner.zones.includes(zone)} key={zone} value={zone}>{shortZone(zone)} · {zoneMeta(planner.date, zone)}</option>)}</select><button className="bg-slate-950 px-4 py-2 text-sm font-bold text-[#f9f7f1] transition hover:bg-orange-700" type="submit">Add</button></form></div></section>
+    <section className="space-y-4">{planner.zones.map((zone) => <article className="grid gap-4 border-t border-slate-400 py-5 sm:grid-cols-[180px_1fr] sm:gap-7" key={zone}><div className="flex justify-between gap-3 sm:block"><div><p className="font-serif text-2xl leading-none">{shortZone(zone)}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{zone} · {zoneMeta(planner.date, zone)}</p><p className="mt-4 font-mono text-sm font-bold">{formatInZone(selectedRange.start, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })} <span className="font-normal text-slate-500">at start</span></p></div>{planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="h-fit text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-orange-700" onClick={() => removeZone(zone)} type="button">Remove</button> : null}</div><Timeline date={planner.date} onSelect={selectRange} selectedEnd={selectedRange.end} selectedStart={selectedRange.start} zone={zone} /></article>)}</section>
   </div></main>;
 }
