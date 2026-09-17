@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string };
 type Theme = "light" | "dark";
@@ -100,6 +100,7 @@ export function App() {
   const [zoneInput, setZoneInput] = useState("");
   const [draggedZone, setDraggedZone] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const draggingZoneRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
   useEffect(() => { setPlanner(loadState()); const savedTheme = localStorage.getItem(THEME_KEY); if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme); setReady(true); }, []);
   useEffect(() => { if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(planner)); }, [planner, ready]);
@@ -132,6 +133,35 @@ export function App() {
     if (!target) return;
     moveZone(zone, target, direction === -1 ? "before" : "after");
   }
+  function dropTargetAt(event: PointerEvent, dragged: string): DropTarget | null {
+    const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-zone]");
+    const target = row?.dataset.zone;
+    if (!target || target === dragged) return null;
+    const bounds = row.getBoundingClientRect();
+    return { zone: target, position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after" };
+  }
+  function beginZoneDrag(event: PointerEvent, zone: string) {
+    try { (event.currentTarget as HTMLButtonElement).setPointerCapture(event.pointerId); } catch { /* Pointer capture is unavailable for synthetic events. */ }
+    draggingZoneRef.current = zone;
+    setDraggedZone(zone);
+  }
+  function updateZoneDrag(event: PointerEvent) {
+    const zone = draggingZoneRef.current;
+    if (zone) setDropTarget(dropTargetAt(event, zone));
+  }
+  function finishZoneDrag(event: PointerEvent) {
+    const zone = draggingZoneRef.current;
+    const target = zone ? dropTargetAt(event, zone) : null;
+    if (zone && target) moveZone(zone, target.zone, target.position);
+    draggingZoneRef.current = null;
+    setDraggedZone(null);
+    setDropTarget(null);
+  }
+  function cancelZoneDrag() {
+    draggingZoneRef.current = null;
+    setDraggedZone(null);
+    setDropTarget(null);
+  }
   function selectRange(zone: string, start: string, end: string) { update({ sourceZone: zone, start, end }); }
   const sourceDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "long", day: "numeric", month: "short" });
   const dark = theme === "dark";
@@ -147,10 +177,10 @@ export function App() {
       const dropBefore = dropTarget?.zone === zone && dropTarget.position === "before";
       const dropAfter = dropTarget?.zone === zone && dropTarget.position === "after";
       const dragHint = `Drag ${shortZone(zone)} to reorder. Press Arrow Up or Arrow Down to move it one row.`;
-      return <article aria-roledescription="reorderable timezone row" className={`relative grid gap-4 border-t py-5 transition-[opacity,transform] duration-150 sm:grid-cols-[180px_1fr] sm:gap-7 ${border} ${isDragging ? "scale-[0.99] opacity-45" : ""}`} key={zone} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(null); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; const bounds = event.currentTarget.getBoundingClientRect(); setDropTarget({ zone, position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after" }); }} onDrop={(event) => { event.preventDefault(); const movedZone = event.dataTransfer?.getData("text/plain") || draggedZone; const position = dropTarget?.zone === zone ? dropTarget.position : "after"; if (movedZone) moveZone(movedZone, zone, position); setDraggedZone(null); setDropTarget(null); }}>
+      return <article aria-roledescription="reorderable timezone row" className={`relative grid gap-4 border-t py-5 transition-[opacity,transform] duration-150 sm:grid-cols-[180px_1fr] sm:gap-7 ${border} ${isDragging ? "scale-[0.99] opacity-45" : ""}`} data-zone={zone} key={zone}>
         {dropBefore ? <div aria-hidden="true" className={`absolute inset-x-0 top-0 h-0.5 ${dark ? "bg-[#f87171]" : "bg-[#dc2626]"}`} /> : null}
         {dropAfter ? <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 h-0.5 ${dark ? "bg-[#f87171]" : "bg-[#dc2626]"}`} /> : null}
-        <div className="flex justify-between gap-3 sm:block"><div className="flex items-start gap-3"><button aria-describedby={`drag-help-${index}`} aria-keyshortcuts="ArrowUp ArrowDown" aria-label={`Reorder ${zone}`} className={`group mt-[-3px] grid h-9 w-8 shrink-0 place-items-center rounded-sm border transition focus:outline-none focus:ring-2 focus:ring-[#ef4444] active:cursor-grabbing ${dark ? "border-slate-700 bg-slate-900 text-slate-400 hover:border-[#f87171] hover:text-[#f87171]" : "border-slate-300 bg-white text-slate-500 hover:border-[#dc2626] hover:text-[#dc2626]"} cursor-grab`} draggable onDragEnd={() => { setDraggedZone(null); setDropTarget(null); }} onDragStart={(event) => { event.dataTransfer?.setData("text/plain", zone); event.dataTransfer.effectAllowed = "move"; setDraggedZone(zone); }} onKeyDown={(event) => { if (event.key === "ArrowUp") { event.preventDefault(); moveZoneByKey(zone, -1); } if (event.key === "ArrowDown") { event.preventDefault(); moveZoneByKey(zone, 1); } }} title={dragHint} type="button"><svg aria-hidden="true" className="h-4 w-3" fill="currentColor" viewBox="0 0 12 16"><circle cx="3" cy="2" r="1.5" /><circle cx="9" cy="2" r="1.5" /><circle cx="3" cy="8" r="1.5" /><circle cx="9" cy="8" r="1.5" /><circle cx="3" cy="14" r="1.5" /><circle cx="9" cy="14" r="1.5" /></svg></button><span className="sr-only" id={`drag-help-${index}`}>{dragHint}</span><div><p className="font-mono text-xl font-bold leading-none">{shortZone(zone)}</p><p className={`mt-1 font-mono text-[11px] ${mutedText}`}>{zone} · {zoneMeta(planner.date, zone)}</p><p className="mt-4 font-mono text-sm font-bold">{formatInZone(selectedRange.start, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</p></div></div>{planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className={`h-fit text-xs font-bold uppercase tracking-wider ${mutedText} ${accent}`} onClick={() => removeZone(zone)} type="button">Remove</button> : null}</div><Timeline date={planner.date} onSelect={selectRange} selectedEnd={selectedRange.end} selectedStart={selectedRange.start} theme={theme} zone={zone} /></article>;
+        <div className="flex justify-between gap-3 sm:block"><div className="flex items-start gap-3"><button aria-describedby={`drag-help-${index}`} aria-keyshortcuts="ArrowUp ArrowDown" aria-label={`Reorder ${zone}`} className={`group mt-[-3px] grid h-9 w-8 shrink-0 place-items-center rounded-sm border transition focus:outline-none focus:ring-2 focus:ring-[#ef4444] active:cursor-grabbing ${dark ? "border-slate-700 bg-slate-900 text-slate-400 hover:border-[#f87171] hover:text-[#f87171]" : "border-slate-300 bg-white text-slate-500 hover:border-[#dc2626] hover:text-[#dc2626]"} cursor-grab touch-none`} onKeyDown={(event) => { if (event.key === "ArrowUp") { event.preventDefault(); moveZoneByKey(zone, -1); } if (event.key === "ArrowDown") { event.preventDefault(); moveZoneByKey(zone, 1); } }} onPointerCancel={cancelZoneDrag} onPointerDown={(event) => beginZoneDrag(event, zone)} onPointerMove={updateZoneDrag} onPointerUp={finishZoneDrag} title={dragHint} type="button"><svg aria-hidden="true" className="h-4 w-3" fill="currentColor" viewBox="0 0 12 16"><circle cx="3" cy="2" r="1.5" /><circle cx="9" cy="2" r="1.5" /><circle cx="3" cy="8" r="1.5" /><circle cx="9" cy="8" r="1.5" /><circle cx="3" cy="14" r="1.5" /><circle cx="9" cy="14" r="1.5" /></svg></button><span className="sr-only" id={`drag-help-${index}`}>{dragHint}</span><div><p className="font-mono text-xl font-bold leading-none">{shortZone(zone)}</p><p className={`mt-1 font-mono text-[11px] ${mutedText}`}>{zone} · {zoneMeta(planner.date, zone)}</p><p className="mt-4 font-mono text-sm font-bold">{formatInZone(selectedRange.start, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</p></div></div>{planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className={`h-fit text-xs font-bold uppercase tracking-wider ${mutedText} ${accent}`} onClick={() => removeZone(zone)} type="button">Remove</button> : null}</div><Timeline date={planner.date} onSelect={selectRange} selectedEnd={selectedRange.end} selectedStart={selectedRange.start} theme={theme} zone={zone} /></article>;
     })}</section>
   </div></main>;
 }
