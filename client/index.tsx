@@ -138,6 +138,19 @@ export function App() {
   useEffect(() => { if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(planner)); }, [planner, ready]);
   useEffect(() => { if (ready) localStorage.setItem(THEME_KEY, theme); }, [ready, theme]);
   useEffect(() => { if (ready) localStorage.setItem(HOUR12_KEY, hour12 ? "1" : "0"); }, [ready, hour12]);
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: PointerEvent) {
+      if (!(e.target as HTMLElement).closest?.("[data-search]")) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const selectedRange = useMemo(() => {
     const s = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
@@ -285,7 +298,7 @@ export function App() {
     <main className={`min-h-screen ${dark ? "bg-zinc-950 text-slate-100" : "bg-white text-slate-900"}`} style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
       <div className="mx-auto max-w-[980px] px-3 py-4">
         {/* search */}
-        <div className="relative mb-4 flex max-w-[430px] items-stretch">
+        <div className="relative mb-4 flex max-w-[430px] items-stretch" data-search>
           <button
             aria-label="Add zone"
             className="grid w-11 shrink-0 place-items-center rounded-l border border-r-0 border-[#ddd] bg-[#f5c04e] text-2xl font-bold leading-none text-black"
