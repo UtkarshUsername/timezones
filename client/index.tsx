@@ -30,8 +30,9 @@ function shortZone(zone: string) {
   return zone.split("/").at(-1)?.replaceAll("_", " ") || zone;
 }
 function localDate() { return new Date().toLocaleDateString("en-CA"); }
+function canonZone(zone: string) { return zone === "Asia/Calcutta" ? "Asia/Kolkata" : zone; }
 function initialState(): SavedState {
-  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const detected = canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   return {
     zones: ["Asia/Kolkata", "Etc/GMT-2", "America/New_York", "America/Los_Angeles"].filter((z) => z !== detected),
     sourceZone: detected, date: localDate(), start: "09:00", end: "10:00",
@@ -41,11 +42,12 @@ function loadState(): SavedState {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "") as Partial<SavedState>;
     if (Array.isArray(saved.zones) && saved.zones.length && saved.sourceZone && saved.date && saved.start) {
-      return { end: saved.start, ...saved } as SavedState;
+      const zones = [...new Set(saved.zones.map(canonZone))];
+      return { end: saved.start, ...saved, zones, sourceZone: canonZone(saved.sourceZone) } as SavedState;
     }
   } catch { /* ignore */ }
   const init = initialState();
-  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const detected = canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   if (!init.zones.includes(detected)) init.zones = [detected, ...init.zones].slice(0, 4);
   return init;
 }
