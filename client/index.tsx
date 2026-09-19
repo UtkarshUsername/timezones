@@ -112,6 +112,15 @@ function dateInput(ts: number, zone: string) {
   const g = (t: string) => parts.find((p) => p.type === t)?.value || "";
   return `${g("year")}-${g("month")}-${g("day")}`;
 }
+const dayFmtCache = new Map<string, Intl.DateTimeFormat>();
+function dayKey(ts: number, zone: string) {
+  let f = dayFmtCache.get(zone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
+    dayFmtCache.set(zone, f);
+  }
+  return f.format(ts);
+}
 function anchorFor(ts: number) {
   return Math.floor((ts - 18 * 3600_000) / 3600_000) * 3600_000;
 }
@@ -398,11 +407,13 @@ export function App() {
                           const digits = parts12.replace(/[^0-9]/g, "");
                           const ampm = parts12.toUpperCase().includes("AM") ? "am" : "pm";
                           const cellHour = hour12 ? digits : formatInZone(ts, zone, { hour: "2-digit", hourCycle: "h23" });
+                          const cellMins = formatInZone(ts, zone, { minute: "2-digit" }).padStart(2, "0");
+                          const spansMidnight = dayKey(ts - 1, zone) !== dayKey(ts + 3599_999, zone);
                           const bg = tone === "day" ? "bg-[#dbe8f8] text-black" : tone === "mid" ? "bg-[#8fb0c7] text-black" : "bg-[#2e4a5a] text-white";
                           const border = tone === "day" ? "border-[#b9cfe8]" : tone === "mid" ? "border-[#7ba0b8]" : "border-[#22394a]";
-                          if (h === 0) {
-                            const wd = formatInZone(ts, zone, { weekday: "short" }).toUpperCase();
-                            const dm = formatInZone(ts, zone, { day: "numeric", month: "short" }).toUpperCase();
+                          if (spansMidnight) {
+                            const wd = formatInZone(ts + 3599_999, zone, { weekday: "short" }).toUpperCase();
+                            const dm = formatInZone(ts + 3599_999, zone, { day: "numeric", month: "short" }).toUpperCase();
                             return (
                               <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} bg-[#2e4a5a] text-white`} style={{ width: CELL_W, height: 64 }}>
                                 <span className="text-[15px] font-bold">{wd}</span>
@@ -412,7 +423,7 @@ export function App() {
                           }
                           return (
                             <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} ${bg}`} style={{ width: CELL_W, height: 64 }}>
-                              <span className="text-[17px] leading-none">{cellHour}</span>
+                              <span className="text-[17px] leading-none">{cellHour}{cellMins !== "00" ? <span className="ml-0.5 align-top text-[10px]">{cellMins}</span> : null}</span>
                               {hour12 ? <span className="pt-0.5 text-[11px] lowercase">{ampm}</span> : null}
                             </div>
                           );
