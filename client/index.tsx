@@ -2,185 +2,377 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string };
 type Theme = "light" | "dark";
-type DropTarget = { zone: string; position: "before" | "after" };
 
 const STORAGE_KEY = "timezones-planner-v1";
 const THEME_KEY = "timezones-theme-v1";
-const zoneOptions = [
-  "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York", "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Helsinki", "Africa/Johannesburg", "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul", "Australia/Perth", "Australia/Sydney", "Pacific/Auckland"
-].sort((first, second) => shortZone(first).localeCompare(shortZone(second)));
+const CELL_W = 62;
+const CELL_GAP = 3;
+const HOURS = 48;
+const NOW_COLOR = "#52b306";
+const SEL_COLOR = "#1498e0";
 
+const zoneOptions = [
+  "Pacific/Midway", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles",
+  "America/Denver", "America/Chicago", "America/New_York", "America/Halifax",
+  "America/Sao_Paulo", "Atlantic/Azores", "Europe/London", "Europe/Paris",
+  "Europe/Berlin", "Europe/Helsinki", "Africa/Cairo", "Africa/Johannesburg",
+  "Asia/Dubai", "Asia/Karachi", "Asia/Kolkata", "Asia/Dhaka", "Asia/Bangkok",
+  "Asia/Singapore", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul",
+  "Australia/Perth", "Australia/Sydney", "Pacific/Auckland",
+].sort((a, b) => shortZone(a).localeCompare(shortZone(b)));
+
+function shortZone(zone: string) { return zone.split("/").at(-1)?.replaceAll("_", " ") || zone; }
 function localDate() { return new Date().toLocaleDateString("en-CA"); }
 function initialState(): SavedState {
   const detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  return { zones: [detected], sourceZone: detected, date: localDate(), start: "09:00", end: "10:00" };
+  return {
+    zones: ["Asia/Kolkata", "Europe/London", "America/New_York", "America/Los_Angeles"].filter((z) => z !== detected),
+    sourceZone: detected, date: localDate(), start: "09:00", end: "10:00",
+  };
 }
 function loadState(): SavedState {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "") as Partial<SavedState>;
-    if (Array.isArray(saved.zones) && saved.zones.length && saved.sourceZone && saved.date && saved.start && saved.end) return saved as SavedState;
-  } catch { /* Invalid local data should not stop the planner. */ }
-  return initialState();
+    if (Array.isArray(saved.zones) && saved.zones.length && saved.sourceZone && saved.date && saved.start) {
+      return { end: saved.start, ...saved } as SavedState;
+    }
+  } catch { /* ignore */ }
+  const init = initialState();
+  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  if (!init.zones.includes(detected)) init.zones = [detected, ...init.zones].slice(0, 4);
+  return init;
 }
-function displayZone(zone: string) { return zone.replaceAll("_", " ").replaceAll("/", " · "); }
-function shortZone(zone: string) { return zone.split("/").at(-1)?.replaceAll("_", " ") || zone; }
-function formatInZone(timestamp: number, zone: string, options: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...options }).format(timestamp);
+function formatInZone(ts: number, zone: string, o: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...o }).format(ts);
 }
-function zoneCode(timestamp: number, zone: string) {
+function zoneCode(ts: number, zone: string) {
   if (zone === "Asia/Kolkata" || zone === "Asia/Calcutta") return "IST";
-  return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(timestamp).find((item) => item.type === "timeZoneName")?.value || "GMT";
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value || "GMT";
+  } catch { return "GMT"; }
 }
-function offsetMinutes(timestamp: number, zone: string) {
-  const part = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(timestamp).find((item) => item.type === "timeZoneName")?.value || "GMT";
-  const match = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-  if (!match) return 0;
-  const minutes = Number(match[2]) * 60 + Number(match[3] || 0);
-  return match[1] === "+" ? minutes : -minutes;
+function offsetMinutes(ts: number, zone: string) {
+  try {
+    const part = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value || "GMT";
+    const m = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+    if (!m) return 0;
+    const mins = Number(m[2]) * 60 + Number(m[3] || 0);
+    return m[1] === "+" ? mins : -mins;
+  } catch { return 0; }
 }
 function zonedTimestamp(date: string, time: string, zone: string) {
-  const [year, month, day] = date.split("-").map(Number);
-  const [hours, minutes] = time.split(":").map(Number);
-  const wallTime = Date.UTC(year, month - 1, day, hours, minutes);
-  let timestamp = wallTime - offsetMinutes(wallTime, zone) * 60_000;
-  timestamp = wallTime - offsetMinutes(timestamp, zone) * 60_000;
-  return timestamp;
+  const [y, mo, d] = date.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const wall = Date.UTC(y, mo - 1, d, h || 0, mi || 0);
+  let ts = wall - offsetMinutes(wall, zone) * 60_000;
+  ts = wall - offsetMinutes(ts, zone) * 60_000;
+  return ts;
 }
-function gmtOffset(timestamp: number, zone: string) {
-  const minutes = offsetMinutes(timestamp, zone);
-  const sign = minutes < 0 ? "−" : "+";
-  const absolute = Math.abs(minutes);
-  const hours = Math.floor(absolute / 60);
-  const remainder = absolute % 60;
-  return `GMT${sign}${hours}${remainder ? `:${hourLabel(remainder)}` : ""}`;
+function gmtLabel(ts: number, zone: string) {
+  const mins = offsetMinutes(ts, zone);
+  const sign = mins < 0 ? "-" : "+";
+  const a = Math.abs(mins);
+  const h = Math.floor(a / 60);
+  const r = a % 60;
+  if (h === 0 && r === 0) return "GMT";
+  return `GMT${sign}${h}${r ? ":" + String(r).padStart(2, "0") : ""}`;
 }
-function zoneMeta(date: string, zone: string) {
-  const timestamp = zonedTimestamp(date, "12:00", zone);
-  const code = zoneCode(timestamp, zone).replace("-", "−");
-  const offset = gmtOffset(timestamp, zone);
-  return code === offset ? `(${offset})` : `(${code} / ${offset})`;
+function fullName(zone: string, ts: number) {
+  try {
+    const long = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "long" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value;
+    if (long && long !== zone) return long;
+  } catch { /* ignore */ }
+  return zone.replaceAll("_", " ");
 }
-function rangeEnd(start: number, end: number) { return end > start ? end : end + 86_400_000; }
-function hourLabel(value: number) { return String(value).padStart(2, "0"); }
-function timeFromMinutes(value: number) {
-  const rounded = Math.round(value / 15) * 15;
-  const minute = ((rounded % 1440) + 1440) % 1440;
-  return `${hourLabel(Math.floor(minute / 60))}:${hourLabel(minute % 60)}`;
+function cellTone(hour: number): "day" | "mid" | "night" {
+  if (hour >= 8 && hour <= 21) return "day";
+  if (hour === 6 || hour === 7 || hour === 22 || hour === 23) return "mid";
+  return "night";
 }
-
-function Timeline({ zone, date, selectedStart, selectedEnd, onSelect, theme }: { zone: string; date: string; selectedStart: number; selectedEnd: number; onSelect: (zone: string, start: string, end: string) => void; theme: Theme }) {
-  const [dragStart, setDragStart] = useState<number | null>(null);
-  const cells = Array.from({ length: 24 }, (_, hour) => {
-    const cellStart = zonedTimestamp(date, `${hourLabel(hour)}:00`, zone);
-    const cellEnd = zonedTimestamp(date, `${hourLabel((hour + 1) % 24)}:00`, zone) + (hour === 23 ? 86_400_000 : 0);
-    return { hour, active: cellStart < selectedEnd && cellEnd > selectedStart };
-  });
-  function minuteAt(pointerEvent: PointerEvent) {
-    const bounds = (pointerEvent.currentTarget as HTMLDivElement).getBoundingClientRect();
-    return Math.max(0, Math.min(1439, ((pointerEvent.clientX - bounds.left) / bounds.width) * 1440));
-  }
-  function updateSelection(pointerEvent: PointerEvent) {
-    if (dragStart === null) return;
-    const current = minuteAt(pointerEvent);
-    const from = Math.min(dragStart, current);
-    const to = Math.max(dragStart, current);
-    onSelect(zone, timeFromMinutes(from), timeFromMinutes(to - from < 15 ? from + 60 : to));
-  }
-  function finish(pointerEvent: PointerEvent) {
-    updateSelection(pointerEvent);
-    setDragStart(null);
-  }
-  const dark = theme === "dark";
-  return <div className="relative"><div className={`grid grid-cols-24 cursor-crosshair touch-none overflow-hidden rounded-sm border focus:outline-none focus:ring-2 focus:ring-[#ef4444] ${dark ? "border-slate-700 bg-[#1e293b]" : "border-slate-200 bg-[#f8fafc]"}`} onPointerDown={(event) => { const start = minuteAt(event); setDragStart(start); onSelect(zone, timeFromMinutes(start), timeFromMinutes(start + 60)); }} onPointerMove={updateSelection} onPointerUp={finish} onPointerCancel={() => setDragStart(null)} role="slider" aria-label={`Select a time range in ${shortZone(zone)}`} tabIndex={0}>{cells.map(({ hour, active }) => <div aria-hidden="true" className={`h-14 border-r last:border-r-0 ${dark ? "border-slate-700" : "border-slate-200"} ${active ? dark ? "bg-[#f87171]" : "bg-[#ef4444]" : hour < 7 || hour > 20 ? dark ? "bg-[#0f172a]" : "bg-slate-800" : dark ? "bg-[#1e293b]" : "bg-[#f8fafc]"}`} key={hour} />)}</div><div className={`grid grid-cols-6 pt-1 text-[10px] font-semibold tracking-[0.12em] ${dark ? "text-slate-400" : "text-slate-500"}`}>{["00", "04", "08", "12", "16", "20"].map((hour) => <span key={hour}>{hour}</span>)}</div></div>;
+function snap15(ts: number) { return Math.round(ts / 900_000) * 900_000; }
+function timeInput(ts: number, zone: string) {
+  return formatInZone(ts, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+function dateInput(ts: number, zone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(ts);
+  const g = (t: string) => parts.find((p) => p.type === t)?.value || "";
+  return `${g("year")}-${g("month")}-${g("day")}`;
+}
+function anchorFor(ts: number) {
+  return Math.floor((ts - 18 * 3600_000) / 3600_000) * 3600_000;
 }
 
 export function App() {
   const [planner, setPlanner] = useState<SavedState>(initialState);
   const [ready, setReady] = useState(false);
-  const [zoneInput, setZoneInput] = useState("");
-  const [draggedZone, setDraggedZone] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  const draggingZoneRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<Theme>("light");
-  useEffect(() => { setPlanner(loadState()); const savedTheme = localStorage.getItem(THEME_KEY); if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme); setReady(true); }, []);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [windowStart, setWindowStart] = useState(() => anchorFor(Date.now()));
+  const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const syncing = useRef(false);
+  const dragZone = useRef<string | null>(null);
+  const tap = useRef<{ x: number; y: number; ts: number; zone: string } | null>(null);
+
+  useEffect(() => {
+    const saved = loadState();
+    setPlanner(saved);
+    try { setWindowStart(anchorFor(zonedTimestamp(saved.date, saved.start, saved.sourceZone))); } catch { /* keep default */ }
+    const t = localStorage.getItem(THEME_KEY);
+    if (t === "dark" || t === "light") setTheme(t);
+    setReady(true);
+    const id = setInterval(() => setNow(Date.now()), 20_000);
+    return () => clearInterval(id);
+  }, []);
   useEffect(() => { if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(planner)); }, [planner, ready]);
   useEffect(() => { if (ready) localStorage.setItem(THEME_KEY, theme); }, [ready, theme]);
+
   const selectedRange = useMemo(() => {
-    const start = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
-    return { start, end: rangeEnd(start, zonedTimestamp(planner.date, planner.end, planner.sourceZone)) };
+    const s = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
+    let e: number;
+    try { e = zonedTimestamp(planner.date, planner.end, planner.sourceZone); } catch { e = s + 3600_000; }
+    if (e <= s) e += 86_400_000;
+    return { start: s, end: e };
   }, [planner.date, planner.end, planner.sourceZone, planner.start]);
-  function update(values: Partial<SavedState>) { setPlanner((current) => ({ ...current, ...values })); }
-  function addZone(event: SubmitEvent) {
-    event.preventDefault(); const zone = zoneInput.trim();
-    if (!zoneOptions.includes(zone) || planner.zones.includes(zone)) return;
-    update({ zones: [...planner.zones, zone] }); setZoneInput("");
+
+  const hours = useMemo(() => Array.from({ length: HOURS }, (_, i) => windowStart + i * 3600_000), [windowStart]);
+
+  function update(v: Partial<SavedState>) { setPlanner((c) => ({ ...c, ...v })); }
+  function goToday() {
+    const t = snap15(now);
+    setWindowStart(anchorFor(t));
+    update({ date: dateInput(t, planner.sourceZone), start: timeInput(t, planner.sourceZone), end: timeInput(t + 3600_000, planner.sourceZone) });
   }
-  function removeZone(zone: string) {
+  function changeDate(d: string) {
+    if (!d) return;
+    update({ date: d });
+    try { setWindowStart(anchorFor(zonedTimestamp(d, planner.start, planner.sourceZone))); } catch { /* ignore */ }
+  }
+  function addZone(z: string) {
+    if (!zoneOptions.includes(z) || planner.zones.includes(z)) return;
+    update({ zones: [...planner.zones, z] });
+    setQuery(""); setOpen(false);
+  }
+  function removeZone(z: string) {
     if (planner.zones.length === 1) return;
-    const zones = planner.zones.filter((item) => item !== zone);
-    update({ zones, sourceZone: planner.sourceZone === zone ? zones[0] : planner.sourceZone });
+    const zones = planner.zones.filter((x) => x !== z);
+    update({ zones, sourceZone: planner.sourceZone === z ? zones[0] : planner.sourceZone });
   }
-  function moveZone(zone: string, target: string, position: "before" | "after") {
-    if (zone === target) return;
-    const zones = planner.zones.filter((item) => item !== zone);
-    const targetIndex = zones.indexOf(target);
-    zones.splice(targetIndex + (position === "after" ? 1 : 0), 0, zone);
+  function moveZone(z: string, dir: -1 | 1) {
+    const i = planner.zones.indexOf(z);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= planner.zones.length) return;
+    const zones = [...planner.zones];
+    [zones[i], zones[j]] = [zones[j], zones[i]];
     update({ zones });
   }
-  function moveZoneByKey(zone: string, direction: -1 | 1) {
-    const index = planner.zones.indexOf(zone);
-    const target = planner.zones[index + direction];
-    if (!target) return;
-    moveZone(zone, target, direction === -1 ? "before" : "after");
+  function selectAt(ts: number, zone: string) {
+    const t = snap15(ts);
+    if (t < windowStart || t >= windowStart + HOURS * 3600_000) setWindowStart(anchorFor(t));
+    update({ sourceZone: zone, date: dateInput(t, zone), start: timeInput(t, zone), end: timeInput(t + 3600_000, zone) });
   }
-  function dropTargetAt(event: PointerEvent, dragged: string): DropTarget | null {
-    const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-zone]");
-    const target = row?.dataset.zone;
-    if (!target || target === dragged) return null;
-    const bounds = row.getBoundingClientRect();
-    return { zone: target, position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after" };
+  function tsAt(clientX: number, el: HTMLDivElement) {
+    const r = el.getBoundingClientRect();
+    const x = clientX - r.left + el.scrollLeft;
+    return windowStart + (x / (CELL_W + CELL_GAP)) * 3600_000;
   }
-  function beginZoneDrag(event: PointerEvent, zone: string) {
-    try { (event.currentTarget as HTMLButtonElement).setPointerCapture(event.pointerId); } catch { /* Pointer capture is unavailable for synthetic events. */ }
-    draggingZoneRef.current = zone;
-    setDraggedZone(zone);
+  function idxAt(clientX: number, el: HTMLDivElement) {
+    return Math.floor((tsAt(clientX, el) - windowStart) / 3600_000);
   }
-  function updateZoneDrag(event: PointerEvent) {
-    const zone = draggingZoneRef.current;
-    if (zone) setDropTarget(dropTargetAt(event, zone));
+  function stripDown(e: PointerEvent, zone: string) {
+    const el = e.currentTarget as HTMLDivElement;
+    const ts = tsAt(e.clientX, el);
+    if (e.pointerType === "mouse") {
+      if (e.button !== 0) return;
+      try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
+      dragZone.current = zone;
+      selectAt(ts, zone);
+    } else {
+      tap.current = { x: e.clientX, y: e.clientY, ts, zone };
+    }
   }
-  function finishZoneDrag(event: PointerEvent) {
-    const zone = draggingZoneRef.current;
-    const target = zone ? dropTargetAt(event, zone) : null;
-    if (zone && target) moveZone(zone, target.zone, target.position);
-    draggingZoneRef.current = null;
-    setDraggedZone(null);
-    setDropTarget(null);
+  function stripMove(e: PointerEvent, zone: string) {
+    const el = e.currentTarget as HTMLDivElement;
+    setHoverIdx(idxAt(e.clientX, el));
+    if (dragZone.current === zone && e.buttons === 1) selectAt(tsAt(e.clientX, el), zone);
   }
-  function cancelZoneDrag() {
-    draggingZoneRef.current = null;
-    setDraggedZone(null);
-    setDropTarget(null);
+  function stripUp(e: PointerEvent, zone: string) {
+    if (dragZone.current === zone) dragZone.current = null;
+    const t = tap.current;
+    tap.current = null;
+    if (t && t.zone === zone && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 8) selectAt(t.ts, zone);
   }
-  function selectRange(zone: string, start: string, end: string) { update({ sourceZone: zone, start, end }); }
-  const sourceDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "long", day: "numeric", month: "short" });
+  function stripCancel() {
+    dragZone.current = null;
+    tap.current = null;
+  }
+  function onSyncScroll(idx: number) {
+    if (syncing.current) return;
+    const src = scrollRefs.current[idx];
+    if (!src) return;
+    syncing.current = true;
+    scrollRefs.current.forEach((el, i) => { if (el && i !== idx) el.scrollLeft = src.scrollLeft; });
+    requestAnimationFrame(() => { syncing.current = false; });
+  }
+
   const dark = theme === "dark";
-  const mutedText = dark ? "text-slate-400" : "text-slate-500";
-  const border = dark ? "border-slate-700" : "border-slate-300";
-  const accent = dark ? "hover:text-[#f87171]" : "hover:text-[#ef4444]";
-  const activeTheme = dark ? "bg-[#f87171] text-slate-950" : "bg-[#ef4444] text-white";
-  return <main className={`min-h-screen overflow-x-hidden px-4 py-6 sm:px-8 sm:py-10 ${dark ? "bg-zinc-950 text-slate-100" : "bg-white text-slate-950"}`}><div className="mx-auto max-w-6xl">
-    <header className={`mb-6 flex items-center justify-between border-b-2 pb-5 ${dark ? "border-slate-200" : "border-slate-900"}`}><h1 className="font-mono text-3xl font-bold tracking-tight sm:text-4xl">Timezones</h1><div className={`flex overflow-hidden rounded-sm border text-xs font-bold ${dark ? "border-slate-600" : "border-slate-300"}`}><button className={`px-3 py-2 ${theme === "light" ? activeTheme : mutedText}`} onClick={() => setTheme("light")} type="button">Light</button><button className={`px-3 py-2 ${theme === "dark" ? activeTheme : mutedText}`} onClick={() => setTheme("dark")} type="button">Dark</button></div></header>
-    <section className={`mb-7 flex flex-wrap items-center justify-between gap-4 border-y py-4 ${border}`}><div className="flex flex-wrap items-center gap-5"><input aria-label="Date" className={`border-b-2 bg-transparent py-1 font-mono text-sm outline-none ${dark ? "border-slate-200 [color-scheme:dark]" : "border-slate-900 [color-scheme:light]"}`} type="date" value={planner.date} onInput={(event) => update({ date: event.currentTarget.value })} /><p className={`border-l-2 pl-4 font-mono text-sm ${dark ? "border-[#f87171]" : "border-[#ef4444]"}`}><b>{planner.start}–{planner.end}</b> · {shortZone(planner.sourceZone)}<br /><span className={`text-xs ${mutedText}`}>{zoneMeta(planner.date, planner.sourceZone)} · {sourceDate}</span></p></div><form className="flex gap-2" onSubmit={addZone}><select aria-label="Timezone to add" className={`min-w-0 border-b-2 bg-transparent px-1 py-2 text-sm outline-none ${dark ? "border-slate-200 [color-scheme:dark]" : "border-slate-900 [color-scheme:light]"}`} value={zoneInput} onChange={(event) => setZoneInput(event.currentTarget.value)}><option className={dark ? "bg-slate-900 text-slate-100" : "bg-white text-slate-950"} value="">Add zone</option>{zoneOptions.map((zone) => <option className={dark ? "bg-slate-900 text-slate-100" : "bg-white text-slate-950"} disabled={planner.zones.includes(zone)} key={zone} value={zone}>{shortZone(zone)} · {zoneMeta(planner.date, zone)}</option>)}</select><button aria-label="Add timezone" className={`px-4 py-2 text-sm font-bold transition ${dark ? "bg-[#f87171] text-slate-950 hover:bg-[#fca5a5]" : "bg-[#dc2626] text-[#f6f7f8] hover:bg-[#ef4444]"}`} type="submit">Add</button></form></section>
-    <section aria-label="Timezone rows" className="space-y-4">{planner.zones.map((zone, index) => {
-      const isDragging = draggedZone === zone;
-      const dropBefore = dropTarget?.zone === zone && dropTarget.position === "before";
-      const dropAfter = dropTarget?.zone === zone && dropTarget.position === "after";
-      const dragHint = `Drag ${shortZone(zone)} to reorder. Press Arrow Up or Arrow Down to move it one row.`;
-      return <article aria-roledescription="reorderable timezone row" className={`relative grid gap-4 border-t py-5 transition-[opacity,transform] duration-150 sm:grid-cols-[180px_1fr] sm:gap-7 ${border} ${isDragging ? "scale-[0.99] opacity-45" : ""}`} data-zone={zone} key={zone}>
-        {dropBefore ? <div aria-hidden="true" className={`absolute inset-x-0 top-0 h-0.5 ${dark ? "bg-[#f87171]" : "bg-[#dc2626]"}`} /> : null}
-        {dropAfter ? <div aria-hidden="true" className={`absolute inset-x-0 bottom-0 h-0.5 ${dark ? "bg-[#f87171]" : "bg-[#dc2626]"}`} /> : null}
-        <div className="flex justify-between gap-3 sm:block"><div className="flex items-start gap-3"><button aria-describedby={`drag-help-${index}`} aria-keyshortcuts="ArrowUp ArrowDown" aria-label={`Reorder ${zone}`} className={`group mt-[-3px] grid h-9 w-8 shrink-0 place-items-center rounded-sm border transition focus:outline-none focus:ring-2 focus:ring-[#ef4444] active:cursor-grabbing ${dark ? "border-slate-700 bg-slate-900 text-slate-400 hover:border-[#f87171] hover:text-[#f87171]" : "border-slate-300 bg-white text-slate-500 hover:border-[#dc2626] hover:text-[#dc2626]"} cursor-grab touch-none`} onKeyDown={(event) => { if (event.key === "ArrowUp") { event.preventDefault(); moveZoneByKey(zone, -1); } if (event.key === "ArrowDown") { event.preventDefault(); moveZoneByKey(zone, 1); } }} onPointerCancel={cancelZoneDrag} onPointerDown={(event) => beginZoneDrag(event, zone)} onPointerMove={updateZoneDrag} onPointerUp={finishZoneDrag} title={dragHint} type="button"><svg aria-hidden="true" className="h-4 w-3" fill="currentColor" viewBox="0 0 12 16"><circle cx="3" cy="2" r="1.5" /><circle cx="9" cy="2" r="1.5" /><circle cx="3" cy="8" r="1.5" /><circle cx="9" cy="8" r="1.5" /><circle cx="3" cy="14" r="1.5" /><circle cx="9" cy="14" r="1.5" /></svg></button><span className="sr-only" id={`drag-help-${index}`}>{dragHint}</span><div><p className="font-mono text-xl font-bold leading-none">{shortZone(zone)}</p><p className={`mt-1 font-mono text-[11px] ${mutedText}`}>{zone} · {zoneMeta(planner.date, zone)}</p><p className="mt-4 font-mono text-sm font-bold">{formatInZone(selectedRange.start, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</p></div></div>{planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className={`h-fit text-xs font-bold uppercase tracking-wider ${mutedText} ${accent}`} onClick={() => removeZone(zone)} type="button">Remove</button> : null}</div><Timeline date={planner.date} onSelect={selectRange} selectedEnd={selectedRange.end} selectedStart={selectedRange.start} theme={theme} zone={zone} /></article>;
-    })}</section>
-  </div></main>;
+  const matches = query.trim()
+    ? zoneOptions.filter((z) => !planner.zones.includes(z) && (z.toLowerCase().includes(query.toLowerCase()) || shortZone(z).toLowerCase().includes(query.toLowerCase()))).slice(0, 8)
+    : zoneOptions.filter((z) => !planner.zones.includes(z)).slice(0, 8);
+
+  const inRange = (i: number | null): i is number => i !== null && i >= 0 && i < HOURS;
+  const nowIdx = Math.floor((now - windowStart) / 3600_000);
+  const selIdx = Math.floor((selectedRange.start - windowStart) / 3600_000);
+  const showHover = inRange(hoverIdx) && hoverIdx !== selIdx ? hoverIdx : null;
+
+  useEffect(() => {
+    const x = selIdx * (CELL_W + CELL_GAP);
+    scrollRefs.current.forEach((el) => { if (el) el.scrollLeft = Math.max(0, x - 220); });
+  }, [windowStart, planner.zones.length, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selLabel = formatInZone(selectedRange.start, planner.sourceZone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+  const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short" });
+
+  function marker(idx: number, color: string, key: string) {
+    return (
+      <div
+        key={key}
+        className="pointer-events-none absolute top-0 z-10 rounded"
+        style={{ left: idx * (CELL_W + CELL_GAP), width: CELL_W, height: 64, border: `3px solid ${color}` }}
+      />
+    );
+  }
+
+  return (
+    <main className={`min-h-screen ${dark ? "bg-zinc-950 text-slate-100" : "bg-white text-slate-900"}`} style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
+      <div className="mx-auto max-w-[980px] px-3 py-4">
+        {/* search */}
+        <div className="relative mb-4 flex max-w-[430px] items-stretch">
+          <button
+            aria-label="Add zone"
+            className="grid w-11 shrink-0 place-items-center rounded-l border border-r-0 border-[#ddd] bg-[#f5c04e] text-2xl font-bold leading-none text-black"
+            onClick={() => setOpen((v) => !v)}
+            type="button"
+          >+</button>
+          <input
+            className={`w-full rounded-r border border-[#ddd] px-3 py-2.5 text-[15px] outline-none ${dark ? "bg-zinc-900 text-slate-100" : "bg-white text-slate-800"}`}
+            onFocus={() => setOpen(true)}
+            onInput={(e) => { setQuery(e.currentTarget.value); setOpen(true); }}
+            placeholder="Search by Location or Timezone name"
+            value={query}
+          />
+          {open ? (
+            <div className={`absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded border shadow-lg ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-white"}`}>
+              {matches.map((z) => (
+                <button key={z} className={`flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#dbe8f8] hover:text-black`} onClick={() => addZone(z)} type="button">
+                  <span><b>{shortZone(z)}</b> <span className="text-gray-500">{z}</span></span>
+                  <span className="text-gray-400">{gmtLabel(now, z)}</span>
+                </button>
+              ))}
+              {matches.length === 0 ? <p className="px-3 py-2 text-[13px] text-gray-500">No matches</p> : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* pre-actions */}
+        <div id="pre-actions" className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
+          <input aria-label="Date" className={`rounded border border-[#ddd] px-2 py-1.5 text-[13px] ${dark ? "bg-zinc-900 [color-scheme:dark]" : "bg-white"}`} type="date" value={planner.date} onInput={(e) => changeDate(e.currentTarget.value)} />
+          <button className={`rounded border px-2 py-1.5 font-bold ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc] hover:bg-[#dbe8f8]"}`} onClick={goToday} type="button">Today</button>
+          <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
+            Selected: <b>{selLabel}</b> · {shortZone(planner.sourceZone)} · {selDate}
+          </span>
+          <span className="text-gray-400">Click or drag an hour box to select it. Green is now, blue is selected.</span>
+          <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
+            <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setTheme("light")} type="button">Light</button>
+            <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-gray-500"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
+          </span>
+        </div>
+
+        {/* card */}
+        <div className={`tzwrap relative overflow-hidden rounded border ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
+          <div className="divide-y divide-[#eee]">
+            {planner.zones.map((zone, zi) => {
+              const code = zoneCode(now, zone);
+              const off = gmtLabel(now, zone);
+              const name = fullName(zone, now);
+              const exact = formatInZone(now, zone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+              const dateStr = formatInZone(now, zone, { weekday: "short", day: "numeric", month: "short" });
+              return (
+                <div key={zone} className="grid grid-cols-[248px_1fr] items-stretch gap-0 max-sm:grid-cols-1">
+                  <div className="px-3 py-2.5">
+                    <p className="text-[15px] font-bold text-black dark:text-slate-100">
+                      <span className={dark ? "text-slate-100" : "text-black"}>{code}</span>{" "}
+                      <span className="ml-1 rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500">{off}</span>
+                    </p>
+                    <p className={`text-[12.5px] leading-tight ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
+                    <p className="mt-2 flex items-start gap-3">
+                      <span>
+                        <span className={`block text-[17px] leading-none ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
+                        <span className="block pt-0.5 text-[12.5px] text-black dark:text-slate-300">{dateStr}</span>
+                      </span>
+                      <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                        <button aria-label={`Move ${code} up`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, -1)} type="button">↑</button>
+                        <button aria-label={`Move ${code} down`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, 1)} type="button">↓</button>
+                        {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="relative min-w-0 py-2 pr-2">
+                    <div
+                      ref={(el) => { scrollRefs.current[zi] = el; }}
+                      className="relative cursor-crosshair select-none overflow-x-auto pb-1"
+                      onScroll={() => onSyncScroll(zi)}
+                      onPointerDown={(e) => stripDown(e, zone)}
+                      onPointerMove={(e) => stripMove(e, zone)}
+                      onPointerUp={(e) => stripUp(e, zone)}
+                      onPointerCancel={stripCancel}
+                      onPointerLeave={() => setHoverIdx(null)}
+                    >
+                      <div className="relative flex" style={{ gap: CELL_GAP, width: HOURS * (CELL_W + CELL_GAP) }}>
+                        {hours.map((ts) => {
+                          const h = Number(formatInZone(ts, zone, { hour: "numeric", hourCycle: "h23" }));
+                          const tone = cellTone(h);
+                          const parts12 = formatInZone(ts, zone, { hour: "numeric", hour12: true });
+                          const digits = parts12.replace(/[^0-9]/g, "");
+                          const ampm = parts12.toUpperCase().includes("AM") ? "am" : "pm";
+                          const bg = tone === "day" ? "bg-[#dbe8f8] text-black" : tone === "mid" ? "bg-[#8fb0c7] text-black" : "bg-[#2e4a5a] text-white";
+                          const border = tone === "day" ? "border-[#b9cfe8]" : tone === "mid" ? "border-[#7ba0b8]" : "border-[#22394a]";
+                          if (h === 0) {
+                            const wd = formatInZone(ts, zone, { weekday: "short" }).toUpperCase();
+                            const dm = formatInZone(ts, zone, { day: "numeric", month: "short" }).toUpperCase();
+                            return (
+                              <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} bg-[#2e4a5a] text-white`} style={{ width: CELL_W, height: 64 }}>
+                                <span className="text-[15px] font-bold">{wd}</span>
+                                <span className="text-[9px]">{dm}</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} ${bg}`} style={{ width: CELL_W, height: 64 }}>
+                              <span className="text-[17px] leading-none">{digits}</span>
+                              <span className="pt-0.5 text-[11px] lowercase">{ampm}</span>
+                            </div>
+                          );
+                        })}
+                        {/* markers: green = now cell, blue = selected cell, faint blue = hover */}
+                        {showHover !== null ? marker(showHover, `${SEL_COLOR}80`, `hov-${zone}`) : null}
+                        {inRange(selIdx) ? marker(selIdx, SEL_COLOR, `sel-${zone}`) : null}
+                        {inRange(nowIdx) ? marker(nowIdx, NOW_COLOR, `now-${zone}`) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <p className="mt-3 text-[12px] text-gray-500">
+          {planner.start}–{planner.end} in {shortZone(planner.sourceZone)} is{" "}
+          {planner.zones.map((z) => `${timeInput(selectedRange.start, z)} ${shortZone(z)}`).join(" · ")}
+        </p>
+      </div>
+    </main>
+  );
 }
