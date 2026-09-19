@@ -114,7 +114,7 @@ export function App() {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [windowStart, setWindowStart] = useState(() => anchorFor(Date.now()));
   const outerRef = useRef<HTMLDivElement | null>(null);
-  const dragZone = useRef<string | null>(null);
+  const drag = useRef<{ zone: string; anchor: number; x0: number } | null>(null);
   const tap = useRef<{ x: number; y: number; ts: number; zone: string } | null>(null);
 
   useEffect(() => {
@@ -169,10 +169,17 @@ export function App() {
     [zones[i], zones[j]] = [zones[j], zones[i]];
     update({ zones });
   }
-  function selectAt(ts: number, zone: string) {
+  function selectHour(ts: number, zone: string) {
     const t = snap15(ts);
     if (t < windowStart || t >= windowStart + HOURS * 3600_000) setWindowStart(anchorFor(t));
     update({ sourceZone: zone, date: dateInput(t, zone), start: timeInput(t, zone), end: timeInput(t + 3600_000, zone) });
+  }
+  function selectRange(from: number, to: number, zone: string) {
+    const s = snap15(Math.min(from, to));
+    let e = snap15(Math.max(from, to));
+    if (e <= s) e = s + 3600_000;
+    if (s < windowStart || e >= windowStart + HOURS * 3600_000) setWindowStart(anchorFor(s));
+    update({ sourceZone: zone, date: dateInput(s, zone), start: timeInput(s, zone), end: timeInput(e, zone) });
   }
   function tsAt(clientX: number, el: HTMLDivElement) {
     const r = el.getBoundingClientRect();
@@ -188,25 +195,29 @@ export function App() {
     if (e.pointerType === "mouse") {
       if (e.button !== 0) return;
       try { el.setPointerCapture(e.pointerId); } catch { /* noop */ }
-      dragZone.current = zone;
-      selectAt(ts, zone);
+      drag.current = { zone, anchor: ts, x0: e.clientX };
+      selectHour(ts, zone);
     } else {
       tap.current = { x: e.clientX, y: e.clientY, ts, zone };
     }
   }
   function stripMove(e: PointerEvent, zone: string) {
     const el = e.currentTarget as HTMLDivElement;
+    const ts = tsAt(e.clientX, el);
     setHoverIdx(idxAt(e.clientX, el));
-    if (dragZone.current === zone && e.buttons === 1) selectAt(tsAt(e.clientX, el), zone);
+    const d = drag.current;
+    if (d && d.zone === zone && e.buttons === 1 && Math.abs(e.clientX - d.x0) > 6) {
+      selectRange(d.anchor, ts, zone);
+    }
   }
   function stripUp(e: PointerEvent, zone: string) {
-    if (dragZone.current === zone) dragZone.current = null;
+    drag.current = null;
     const t = tap.current;
     tap.current = null;
-    if (t && t.zone === zone && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 8) selectAt(t.ts, zone);
+    if (t && t.zone === zone && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 8) selectHour(t.ts, zone);
   }
   function stripCancel() {
-    dragZone.current = null;
+    drag.current = null;
     tap.current = null;
   }
 
@@ -227,6 +238,23 @@ export function App() {
 
   const selLabel = formatInZone(selectedRange.start, planner.sourceZone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
   const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short" });
+
+  function spanRange(s: number, e: number, color: string, key: string) {
+    const pitch = CELL_W + CELL_GAP;
+    const total = HOURS * pitch;
+    const x0 = ((s - windowStart) / 3600_000) * pitch;
+    const x1 = ((e - windowStart) / 3600_000) * pitch;
+    const l = Math.max(0, x0);
+    const r = Math.min(total, x1);
+    if (r - l < 4) return null;
+    return (
+      <div
+        key={key}
+        className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
+        style={{ left: INFO_W + l, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: "rgba(20, 152, 224, 0.10)" }}
+      />
+    );
+  }
 
   function spanMarker(idx: number, color: string, key: string) {
     return (
@@ -276,7 +304,7 @@ export function App() {
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
             Selected: <b>{selLabel}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
-          <span className="text-gray-400">Click or drag an hour box to select it. Green is now, blue is selected.</span>
+          <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. Green is now, blue is selected.</span>
           <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
             <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setTheme("light")} type="button">Light</button>
             <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-gray-500"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
@@ -355,7 +383,7 @@ export function App() {
               })}
               {/* full-height markers spanning all rows, like the reference */}
               {showHover !== null ? spanMarker(showHover, `${SEL_COLOR}80`, "hov") : null}
-              {inRange(selIdx) ? spanMarker(selIdx, SEL_COLOR, "sel") : null}
+              {spanRange(selectedRange.start, selectedRange.end, SEL_COLOR, "sel")}
               {inRange(nowIdx) ? spanMarker(nowIdx, NOW_COLOR, "now") : null}
             </div>
           </div>
