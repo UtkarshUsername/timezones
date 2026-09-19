@@ -5,6 +5,7 @@ type Theme = "light" | "dark";
 
 const STORAGE_KEY = "timezones-planner-v1";
 const THEME_KEY = "timezones-theme-v1";
+const HOUR12_KEY = "timezones-hour12-v1";
 const CELL_W = 62;
 const CELL_GAP = 3;
 const HOURS = 48;
@@ -95,6 +96,11 @@ function snap15(ts: number) { return Math.round(ts / 900_000) * 900_000; }
 function timeInput(ts: number, zone: string) {
   return formatInZone(ts, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
+function fmtTime(ts: number, zone: string, hour12: boolean) {
+  return hour12
+    ? formatInZone(ts, zone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()
+    : formatInZone(ts, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
 function dateInput(ts: number, zone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(ts);
   const g = (t: string) => parts.find((p) => p.type === t)?.value || "";
@@ -108,6 +114,7 @@ export function App() {
   const [planner, setPlanner] = useState<SavedState>(initialState);
   const [ready, setReady] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
+  const [hour12, setHour12] = useState(true);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -123,12 +130,14 @@ export function App() {
     try { setWindowStart(anchorFor(zonedTimestamp(saved.date, saved.start, saved.sourceZone))); } catch { /* keep default */ }
     const t = localStorage.getItem(THEME_KEY);
     if (t === "dark" || t === "light") setTheme(t);
+    if (localStorage.getItem(HOUR12_KEY) === "0") setHour12(false);
     setReady(true);
     const id = setInterval(() => setNow(Date.now()), 20_000);
     return () => clearInterval(id);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(planner)); }, [planner, ready]);
   useEffect(() => { if (ready) localStorage.setItem(THEME_KEY, theme); }, [ready, theme]);
+  useEffect(() => { if (ready) localStorage.setItem(HOUR12_KEY, hour12 ? "1" : "0"); }, [ready, hour12]);
 
   const selectedRange = useMemo(() => {
     const s = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
@@ -236,7 +245,7 @@ export function App() {
     if (el) el.scrollLeft = Math.max(0, selIdx * (CELL_W + CELL_GAP) - 220);
   }, [windowStart, planner.zones.length, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const selLabel = formatInZone(selectedRange.start, planner.sourceZone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+  const selLabel = fmtTime(selectedRange.start, planner.sourceZone, hour12);
   const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short" });
 
   function spanRange(s: number, e: number, color: string, key: string) {
@@ -306,6 +315,10 @@ export function App() {
           </span>
           <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. Green is now, blue is selected.</span>
           <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
+            <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(true)} type="button">12h</button>
+            <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(false)} type="button">24h</button>
+          </span>
+          <span className="flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
             <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setTheme("light")} type="button">Light</button>
             <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-gray-500"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
           </span>
@@ -319,7 +332,7 @@ export function App() {
                 const code = zoneCode(now, zone);
                 const off = gmtLabel(now, zone);
                 const name = fullName(zone, now);
-                const exact = formatInZone(now, zone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+                const exact = fmtTime(now, zone, hour12);
                 const dateStr = formatInZone(now, zone, { weekday: "short", day: "numeric", month: "short" });
                 return (
                   <div key={zone} className={`grid${zi > 0 ? ` border-t ${dark ? "border-zinc-700" : "border-[#eee]"}` : ""}`} style={{ gridTemplateColumns: `${INFO_W}px ${STRIP_W}px` }}>
@@ -356,6 +369,7 @@ export function App() {
                           const parts12 = formatInZone(ts, zone, { hour: "numeric", hour12: true });
                           const digits = parts12.replace(/[^0-9]/g, "");
                           const ampm = parts12.toUpperCase().includes("AM") ? "am" : "pm";
+                          const cellHour = hour12 ? digits : formatInZone(ts, zone, { hour: "2-digit", hourCycle: "h23" });
                           const bg = tone === "day" ? "bg-[#dbe8f8] text-black" : tone === "mid" ? "bg-[#8fb0c7] text-black" : "bg-[#2e4a5a] text-white";
                           const border = tone === "day" ? "border-[#b9cfe8]" : tone === "mid" ? "border-[#7ba0b8]" : "border-[#22394a]";
                           if (h === 0) {
@@ -370,8 +384,8 @@ export function App() {
                           }
                           return (
                             <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} ${bg}`} style={{ width: CELL_W, height: 64 }}>
-                              <span className="text-[17px] leading-none">{digits}</span>
-                              <span className="pt-0.5 text-[11px] lowercase">{ampm}</span>
+                              <span className="text-[17px] leading-none">{cellHour}</span>
+                              {hour12 ? <span className="pt-0.5 text-[11px] lowercase">{ampm}</span> : null}
                             </div>
                           );
                         })}
@@ -389,8 +403,8 @@ export function App() {
           </div>
         </div>
         <p className="mt-3 text-[12px] text-gray-500">
-          {planner.start}–{planner.end} in {shortZone(planner.sourceZone)} is{" "}
-          {planner.zones.map((z) => `${timeInput(selectedRange.start, z)} ${shortZone(z)}`).join(" · ")}
+          {fmtTime(selectedRange.start, planner.sourceZone, hour12)}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)} in {shortZone(planner.sourceZone)} is{" "}
+          {planner.zones.map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
         </p>
       </div>
     </main>
