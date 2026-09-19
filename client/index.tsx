@@ -8,6 +8,8 @@ const THEME_KEY = "timezones-theme-v1";
 const CELL_W = 62;
 const CELL_GAP = 3;
 const HOURS = 48;
+const INFO_W = 248;
+const STRIP_W = HOURS * (CELL_W + CELL_GAP);
 const NOW_COLOR = "#52b306";
 const SEL_COLOR = "#1498e0";
 
@@ -111,8 +113,7 @@ export function App() {
   const [now, setNow] = useState(() => Date.now());
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [windowStart, setWindowStart] = useState(() => anchorFor(Date.now()));
-  const scrollRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const syncing = useRef(false);
+  const outerRef = useRef<HTMLDivElement | null>(null);
   const dragZone = useRef<string | null>(null);
   const tap = useRef<{ x: number; y: number; ts: number; zone: string } | null>(null);
 
@@ -175,7 +176,7 @@ export function App() {
   }
   function tsAt(clientX: number, el: HTMLDivElement) {
     const r = el.getBoundingClientRect();
-    const x = clientX - r.left + el.scrollLeft;
+    const x = clientX - r.left;
     return windowStart + (x / (CELL_W + CELL_GAP)) * 3600_000;
   }
   function idxAt(clientX: number, el: HTMLDivElement) {
@@ -208,14 +209,6 @@ export function App() {
     dragZone.current = null;
     tap.current = null;
   }
-  function onSyncScroll(idx: number) {
-    if (syncing.current) return;
-    const src = scrollRefs.current[idx];
-    if (!src) return;
-    syncing.current = true;
-    scrollRefs.current.forEach((el, i) => { if (el && i !== idx) el.scrollLeft = src.scrollLeft; });
-    requestAnimationFrame(() => { syncing.current = false; });
-  }
 
   const dark = theme === "dark";
   const matches = query.trim()
@@ -228,8 +221,8 @@ export function App() {
   const showHover = inRange(hoverIdx) && hoverIdx !== selIdx ? hoverIdx : null;
 
   useEffect(() => {
-    const x = selIdx * (CELL_W + CELL_GAP);
-    scrollRefs.current.forEach((el) => { if (el) el.scrollLeft = Math.max(0, x - 220); });
+    const el = outerRef.current;
+    if (el) el.scrollLeft = Math.max(0, selIdx * (CELL_W + CELL_GAP) - 220);
   }, [windowStart, planner.zones.length, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selLabel = formatInZone(selectedRange.start, planner.sourceZone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
@@ -290,47 +283,45 @@ export function App() {
           </span>
         </div>
 
-        {/* card */}
+        {/* card: one shared horizontal scrollbar for all rows */}
         <div className={`tzwrap relative overflow-hidden rounded border ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
-          <div className="divide-y divide-[#eee]">
-            {planner.zones.map((zone, zi) => {
-              const code = zoneCode(now, zone);
-              const off = gmtLabel(now, zone);
-              const name = fullName(zone, now);
-              const exact = formatInZone(now, zone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
-              const dateStr = formatInZone(now, zone, { weekday: "short", day: "numeric", month: "short" });
-              return (
-                <div key={zone} className="grid grid-cols-[248px_1fr] items-stretch gap-0 max-sm:grid-cols-1">
-                  <div className="px-3 py-2.5">
-                    <p className="text-[15px] font-bold text-black dark:text-slate-100">
-                      <span className={dark ? "text-slate-100" : "text-black"}>{code}</span>{" "}
-                      <span className="ml-1 rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500">{off}</span>
-                    </p>
-                    <p className={`text-[12.5px] leading-tight ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
-                    <p className="mt-2 flex items-start gap-3">
-                      <span>
-                        <span className={`block text-[17px] leading-none ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
-                        <span className="block pt-0.5 text-[12.5px] text-black dark:text-slate-300">{dateStr}</span>
-                      </span>
-                      <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-gray-400">
-                        <button aria-label={`Move ${code} up`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, -1)} type="button">↑</button>
-                        <button aria-label={`Move ${code} down`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, 1)} type="button">↓</button>
-                        {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
-                      </span>
-                    </p>
-                  </div>
-                  <div className="relative min-w-0 py-2 pr-2">
+          <div ref={outerRef} className="overflow-x-auto">
+            <div style={{ minWidth: INFO_W + STRIP_W }}>
+              {planner.zones.map((zone, zi) => {
+                const code = zoneCode(now, zone);
+                const off = gmtLabel(now, zone);
+                const name = fullName(zone, now);
+                const exact = formatInZone(now, zone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+                const dateStr = formatInZone(now, zone, { weekday: "short", day: "numeric", month: "short" });
+                return (
+                  <div key={zone} className={`grid${zi > 0 ? ` border-t ${dark ? "border-zinc-700" : "border-[#eee]"}` : ""}`} style={{ gridTemplateColumns: `${INFO_W}px ${STRIP_W}px` }}>
+                    <div className={`sticky left-0 z-20 border-r border-[#eee] px-3 py-2.5 ${dark ? "border-zinc-700 bg-zinc-900" : "bg-white"}`}>
+                      <p className={`text-[15px] font-bold ${dark ? "text-slate-100" : "text-black"}`}>
+                        <span className={dark ? "text-slate-100" : "text-black"}>{code}</span>{" "}
+                        <span className="ml-1 rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500">{off}</span>
+                      </p>
+                      <p className={`text-[12.5px] leading-tight ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
+                      <p className="mt-2 flex items-start gap-3">
+                        <span>
+                          <span className={`block text-[17px] leading-none ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
+                          <span className={`block pt-0.5 text-[12.5px] ${dark ? "text-slate-300" : "text-black"}`}>{dateStr}</span>
+                        </span>
+                        <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                          <button aria-label={`Move ${code} up`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, -1)} type="button">↑</button>
+                          <button aria-label={`Move ${code} down`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, 1)} type="button">↓</button>
+                          {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
+                        </span>
+                      </p>
+                    </div>
                     <div
-                      ref={(el) => { scrollRefs.current[zi] = el; }}
-                      className="relative cursor-crosshair select-none overflow-x-auto pb-1"
-                      onScroll={() => onSyncScroll(zi)}
+                      className="relative min-w-0 cursor-crosshair select-none py-2 pr-2"
                       onPointerDown={(e) => stripDown(e, zone)}
                       onPointerMove={(e) => stripMove(e, zone)}
                       onPointerUp={(e) => stripUp(e, zone)}
                       onPointerCancel={stripCancel}
                       onPointerLeave={() => setHoverIdx(null)}
                     >
-                      <div className="relative flex" style={{ gap: CELL_GAP, width: HOURS * (CELL_W + CELL_GAP) }}>
+                      <div className="relative flex" style={{ gap: CELL_GAP, width: STRIP_W }}>
                         {hours.map((ts) => {
                           const h = Number(formatInZone(ts, zone, { hour: "numeric", hourCycle: "h23" }));
                           const tone = cellTone(h);
@@ -363,9 +354,9 @@ export function App() {
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
         <p className="mt-3 text-[12px] text-gray-500">
