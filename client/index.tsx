@@ -17,19 +17,23 @@ const SEL_COLOR = "#1498e0";
 const zoneOptions = [
   "Pacific/Midway", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles",
   "America/Denver", "America/Chicago", "America/New_York", "America/Halifax",
-  "America/Sao_Paulo", "Atlantic/Azores", "Europe/London", "Europe/Paris",
+  "America/Sao_Paulo", "Atlantic/Azores", "Etc/GMT-2", "Europe/London", "Europe/Paris",
   "Europe/Berlin", "Europe/Helsinki", "Africa/Cairo", "Africa/Johannesburg",
   "Asia/Dubai", "Asia/Karachi", "Asia/Kolkata", "Asia/Dhaka", "Asia/Bangkok",
   "Asia/Singapore", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul",
   "Australia/Perth", "Australia/Sydney", "Pacific/Auckland",
 ].sort((a, b) => shortZone(a).localeCompare(shortZone(b)));
 
-function shortZone(zone: string) { return zone.split("/").at(-1)?.replaceAll("_", " ") || zone; }
+function shortZone(zone: string) {
+  const etc = zone.match(/^Etc\/GMT([+-])(\d+)$/);
+  if (etc) return `GMT${etc[1] === "+" ? "-" : "+"}${Number(etc[2])}`;
+  return zone.split("/").at(-1)?.replaceAll("_", " ") || zone;
+}
 function localDate() { return new Date().toLocaleDateString("en-CA"); }
 function initialState(): SavedState {
   const detected = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   return {
-    zones: ["Asia/Kolkata", "Europe/London", "America/New_York", "America/Los_Angeles"].filter((z) => z !== detected),
+    zones: ["Asia/Kolkata", "Etc/GMT-2", "America/New_York", "America/Los_Angeles"].filter((z) => z !== detected),
     sourceZone: detected, date: localDate(), start: "09:00", end: "10:00",
   };
 }
