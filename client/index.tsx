@@ -231,8 +231,14 @@ export function App() {
   }
 
   const dark = theme === "dark";
-  const matches = query.trim()
-    ? zoneOptions.filter((z) => !planner.zones.includes(z) && (z.toLowerCase().includes(query.toLowerCase()) || shortZone(z).toLowerCase().includes(query.toLowerCase()))).slice(0, 8)
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? zoneOptions.filter((z) =>
+        z.toLowerCase().includes(q)
+        || shortZone(z).toLowerCase().includes(q)
+        || zoneCode(now, z).toLowerCase().includes(q)
+        || fullName(z, now).toLowerCase().includes(q)
+        || gmtLabel(now, z).toLowerCase().includes(q)).slice(0, 8)
     : zoneOptions.filter((z) => !planner.zones.includes(z)).slice(0, 8);
 
   const inRange = (i: number | null): i is number => i !== null && i >= 0 && i < HOURS;
@@ -295,12 +301,15 @@ export function App() {
           />
           {open ? (
             <div className={`absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded border shadow-lg ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-white"}`}>
-              {matches.map((z) => (
-                <button key={z} className={`flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-[#dbe8f8] hover:text-black`} onClick={() => addZone(z)} type="button">
-                  <span><b>{shortZone(z)}</b> <span className="text-gray-500">{z}</span></span>
-                  <span className="text-gray-400">{gmtLabel(now, z)}</span>
-                </button>
-              ))}
+              {matches.map((z) => {
+                const added = planner.zones.includes(z);
+                return (
+                  <button key={z} className={`flex w-full items-center justify-between px-3 py-2 text-left text-[13px] ${added ? "cursor-default opacity-50" : "hover:bg-[#dbe8f8] hover:text-black"}`} disabled={added} onClick={() => addZone(z)} type="button">
+                    <span><b>{zoneCode(now, z)}</b> · {shortZone(z)} <span className="text-gray-500">{z}</span></span>
+                    <span className="text-gray-400">{added ? "added" : gmtLabel(now, z)}</span>
+                  </button>
+                );
+              })}
               {matches.length === 0 ? <p className="px-3 py-2 text-[13px] text-gray-500">No matches</p> : null}
             </div>
           ) : null}
