@@ -228,12 +228,12 @@ export function App() {
   const selLabel = formatInZone(selectedRange.start, planner.sourceZone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
   const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short" });
 
-  function marker(idx: number, color: string, key: string) {
+  function spanMarker(idx: number, color: string, key: string) {
     return (
       <div
         key={key}
-        className="pointer-events-none absolute top-0 z-10 rounded"
-        style={{ left: idx * (CELL_W + CELL_GAP), width: CELL_W, height: 64, border: `3px solid ${color}` }}
+        className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
+        style={{ left: INFO_W + idx * (CELL_W + CELL_GAP), width: CELL_W, border: `3px solid ${color}` }}
       />
     );
   }
@@ -286,7 +286,7 @@ export function App() {
         {/* card: one shared horizontal scrollbar for all rows */}
         <div className={`tzwrap relative overflow-hidden rounded border ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
           <div ref={outerRef} className="overflow-x-auto">
-            <div style={{ minWidth: INFO_W + STRIP_W }}>
+            <div className="relative" style={{ minWidth: INFO_W + STRIP_W }}>
               {planner.zones.map((zone, zi) => {
                 const code = zoneCode(now, zone);
                 const off = gmtLabel(now, zone);
@@ -347,15 +347,16 @@ export function App() {
                             </div>
                           );
                         })}
-                        {/* markers: green = now cell, blue = selected cell, faint blue = hover */}
-                        {showHover !== null ? marker(showHover, `${SEL_COLOR}80`, `hov-${zone}`) : null}
-                        {inRange(selIdx) ? marker(selIdx, SEL_COLOR, `sel-${zone}`) : null}
-                        {inRange(nowIdx) ? marker(nowIdx, NOW_COLOR, `now-${zone}`) : null}
+                        {/* full-height overlays render below, spanning all rows */}
                       </div>
                     </div>
                   </div>
                 );
               })}
+              {/* full-height markers spanning all rows, like the reference */}
+              {showHover !== null ? spanMarker(showHover, `${SEL_COLOR}80`, "hov") : null}
+              {inRange(selIdx) ? spanMarker(selIdx, SEL_COLOR, "sel") : null}
+              {inRange(nowIdx) ? spanMarker(nowIdx, NOW_COLOR, "now") : null}
             </div>
           </div>
         </div>
