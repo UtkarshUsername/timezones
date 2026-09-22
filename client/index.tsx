@@ -441,6 +441,14 @@ export function App() {
             </div>
           </div>
         </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-gray-500">
+          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm bg-white" style={{ border: `2px solid ${NOW_COLOR}` }} />Now</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm" style={{ border: `2px solid ${SEL_COLOR}`, background: "rgba(20, 152, 224, 0.10)" }} />Selected</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#b9cfe8] bg-[#dbe8f8]" />Daytime</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#7ba0b8] bg-[#8fb0c7]" />Morning / evening</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#22394a] bg-[#2e4a5a]" />Night</span>
+          <span className="flex items-center gap-1.5"><span className="flex h-4 items-center rounded-sm border border-[#22394a] bg-[#2e4a5a] px-1 text-[9px] font-bold leading-none text-white">SUN</span>Midnight</span>
+        </div>
         <p className="mt-3 text-[12px] text-gray-500">
           {fmtTime(selectedRange.start, planner.sourceZone, hour12)}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)} in {shortZone(planner.sourceZone)} is{" "}
           {planner.zones.map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
