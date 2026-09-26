@@ -1,100 +1,200 @@
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { canAccessApp, createClient, Link, retryAuth, SignInWithGoogle, useAuth, useParams } from "lakebed/client";
 import type app from "../server/index";
 
 const client = createClient<typeof app>();
 const zones = ["Asia/Kolkata", "Etc/UTC", "Europe/London", "Europe/Paris", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Asia/Dubai", "Asia/Singapore", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland"];
-const fmt = (ts: number, zone: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { timeZone: zone, ...options }).format(ts);
-function parts(ts: number, zone: string) {
-  const p = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(ts);
-  const get = (key: string) => p.find(x => x.type === key)?.value || "";
+const DAY = 86_400_000;
+const formatters = new Map<string, Intl.DateTimeFormat>();
+const displayFormatters = new Map<string, Intl.DateTimeFormat>();
+
+type Poll = { title: string; dates: string; zone: string; startHour: number; endHour: number };
+type Response = { id: string; name: string; slots: string; isMine: boolean };
+type PollData = { poll: Poll; responses: Response[] };
+
+function format(ts: number, zone: string, options: Intl.DateTimeFormatOptions) {
+  const key = `${zone}:${JSON.stringify(options)}`;
+  let formatter = displayFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", { timeZone: zone, ...options });
+    displayFormatters.set(key, formatter);
+  }
+  return formatter.format(ts);
+}
+function localParts(ts: number, zone: string) {
+  let formatter = formatters.get(zone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    formatters.set(zone, formatter);
+  }
+  const parts = formatter.formatToParts(ts);
+  const get = (key: string) => parts.find(p => p.type === key)?.value || "";
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 function timestamp(date: string, minute: number, zone: string) {
-  const [y, m, d] = date.split("-").map(Number);
-  const wall = Date.UTC(y, m - 1, d, 0, minute);
+  const [year, month, day] = date.split("-").map(Number);
+  const wall = Date.UTC(year, month - 1, day, 0, minute);
   const target = `${date}T${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-  const offsets = [wall - 36 * 3600000, wall, wall + 36 * 3600000].map(t => {
-    const s = parts(t, zone);
-    return Date.parse(`${s}Z`) - t;
-  });
-  const matches = [...new Set(offsets)].map(o => wall - o).sort((a, b) => a - b);
-  return matches.find(t => parts(t, zone) === target) ?? matches.find(t => parts(t, zone) > target) ?? matches[0];
+  const offsets = [wall - 36 * 3_600_000, wall, wall + 36 * 3_600_000].map(t => Date.parse(`${localParts(t, zone)}Z`) - t);
+  const candidates = [...new Set(offsets)].map(offset => wall - offset).sort((a, b) => a - b);
+  return candidates.find(t => localParts(t, zone) === target)
+    ?? candidates.find(t => localParts(t, zone) > target)
+    ?? candidates[0];
 }
-function slotsFor(poll: { dates: string; zone: string; startHour: number; endHour: number }) {
-  const dates = JSON.parse(poll.dates) as string[];
-  return dates.map(date => Array.from({ length: (poll.endHour - poll.startHour) * 4 }, (_, i) => timestamp(date, poll.startHour * 60 + i * 15, poll.zone)));
+function dateKey(ts: number) { return new Date(ts).toISOString().slice(0, 10); }
+function dateRange(a: string, b: string) {
+  const start = Math.min(Date.parse(a), Date.parse(b));
+  const end = Math.max(Date.parse(a), Date.parse(b));
+  return Array.from({ length: Math.floor((end - start) / DAY) + 1 }, (_, i) => dateKey(start + i * DAY));
 }
+const control = "rounded border border-[#d3d3d3] bg-white px-3 py-2 text-sm focus:border-[#1498e0] focus:outline-none";
+const primary = "rounded border border-[#b9cfe8] bg-[#1498e0] px-4 py-2 text-sm font-bold text-white hover:bg-[#0879bc] disabled:opacity-50";
+
 function Gate({ children }: { children: any }) {
   const auth = useAuth();
-  if (auth.isLoading) return <main className="p-8">Checking session…</main>;
-  if (!canAccessApp()) return <main className="mx-auto max-w-xl p-8"><p role="alert">{auth.error || "Sign in to continue"}</p><button className="mr-3 underline" onClick={() => void retryAuth()}>Retry</button><SignInWithGoogle /></main>;
+  if (auth.isLoading) return <main className="p-6">Checking session…</main>;
+  if (!canAccessApp()) return <main className="mx-auto max-w-xl p-6"><p role="alert">{auth.error || "Sign in to continue"}</p><button className="mr-3 underline" onClick={() => void retryAuth()}>Retry</button><SignInWithGoogle /></main>;
   return children;
 }
 function Shell({ children }: { children: any }) {
-  return <main className="min-h-screen bg-[#f6f4ef] px-4 py-6 text-[#172b35] sm:px-8" style={{ fontFamily: "Georgia, serif" }}><div className="mx-auto max-w-6xl"><header className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-[#c9d2ce] pb-5"><Link to="/" className="text-2xl font-bold tracking-tight">Timezones<span className="text-[#d66b41]">.</span></Link><nav className="flex gap-5 text-sm font-bold"><Link to="/">Time planner</Link><Link to="/polls">Group polls</Link></nav></header>{children}</div></main>;
+  return <main className="min-h-screen bg-white text-slate-900" style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
+    <div className="mx-auto max-w-[1100px] px-3 py-4">
+      <nav className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 text-sm">
+        <Link to="/" className="text-lg font-bold tracking-tight text-black">Timezones</Link>
+        <div className="flex items-center gap-2"><Link to="/" className="rounded border border-[#ddd] px-3 py-2 font-bold hover:bg-[#dbe8f8]">Time planner</Link><Link to="/polls" className="rounded bg-[#f5c04e] px-3 py-2 font-bold text-black">Group polls</Link></div>
+      </nav>
+      {children}
+    </div>
+  </main>;
 }
-export function PollsHome() {
-  return <Gate><PollsHomeContent /></Gate>;
-}
+
+export function PollsHome() { return <Gate><PollsHomeContent /></Gate>; }
 function PollsHomeContent() {
   const polls = client.useQuery("myPolls");
-  return <Shell><div className="mb-12 flex flex-wrap items-end justify-between gap-5"><div><p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#bd6040]">Find a shared hour</p><h1 className="text-4xl font-bold sm:text-5xl">Group availability</h1><p className="mt-3 max-w-lg text-[#52616a]">Choose possible dates, share one link, and see when everyone can meet.</p></div><Link to="/polls/new" className="rounded bg-[#173b46] px-6 py-3 font-bold text-white hover:bg-[#245765]">Create a poll →</Link></div><h2 className="mb-4 border-b border-[#c9d2ce] pb-3 text-xl font-bold">Your polls</h2>{polls === undefined ? <p>Loading…</p> : polls.length ? <div className="grid gap-3 sm:grid-cols-2">{polls.map(p => <Link key={p.id} to={`/polls/${p.id}`} className="rounded border border-[#d3dad6] bg-white p-5 shadow-sm hover:border-[#3b807b]"><strong className="block text-lg">{p.title}</strong><span className="mt-2 block text-sm text-[#65747a]">{(JSON.parse(p.dates) as string[]).length} dates · {p.zone}</span></Link>)}</div> : <p className="rounded border border-dashed border-[#b8c8c2] p-8 text-[#65747a]">No polls yet. Create one to start finding a time together.</p>}</Shell>;
+  return <Shell>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-bold">Group polls</h1><p className="mt-1 text-sm text-gray-500">Find a time that works for everyone.</p></div><Link to="/polls/new" className={primary}>Create a poll</Link></div>
+    <h2 className="mb-3 border-b border-[#ddd] pb-2 text-sm font-bold">Your polls</h2>
+    {polls === undefined ? <p className="text-sm text-gray-500">Loading…</p> : polls.length ? <div className="grid gap-2 sm:grid-cols-2">{polls.map(p => <Link key={p.id} to={`/polls/${p.id}`} className="rounded border border-[#ddd] bg-[#f7f9fc] p-4 hover:border-[#1498e0]"><strong className="block text-base">{p.title}</strong><span className="mt-1 block text-xs text-gray-500">{(JSON.parse(p.dates) as string[]).length} dates · {p.zone}</span></Link>)}</div> : <p className="rounded border border-dashed border-[#ddd] p-6 text-sm text-gray-500">No polls yet. Create one to start.</p>}
+  </Shell>;
 }
+
+function Calendar({ dates, onChange }: { dates: string[]; onChange: (dates: string[]) => void }) {
+  const [month, setMonth] = useState(() => { const now = new Date(); return new Date(now.getFullYear(), now.getMonth(), 1); });
+  const drag = useRef<{ anchor: string; add: boolean; original: string[] } | null>(null);
+  const today = dateKey(Date.now());
+  const last = dateKey(Date.now() + 366 * DAY);
+  const start = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const first = Date.UTC(month.getFullYear(), month.getMonth(), 1 - start);
+  const cells = Array.from({ length: 42 }, (_, i) => dateKey(first + i * DAY));
+  function select(date: string, state: NonNullable<typeof drag.current>) {
+    const span = dateRange(state.anchor, date);
+    if (span.length > 14) return;
+    const next = state.add ? [...new Set([...state.original, ...span])] : state.original.filter(d => !span.includes(d));
+    if (next.length <= 14) onChange(next.sort());
+  }
+  function begin(e: PointerEvent, date: string) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    drag.current = { anchor: date, add: !dates.includes(date), original: dates };
+    (e.currentTarget as HTMLElement).parentElement?.setPointerCapture(e.pointerId);
+    select(date, drag.current);
+  }
+  function move(e: PointerEvent) {
+    if (!drag.current) return;
+    const date = (document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-date]") as HTMLElement | null)?.dataset.date;
+    if (date && date >= today && date <= last) select(date, drag.current);
+  }
+  return <div className="max-w-[430px] rounded border border-[#d3d3d3] bg-[#f7f9fc] p-3">
+    <div className="mb-3 flex items-center justify-between gap-2"><button type="button" aria-label="Previous month" className="rounded border border-[#ddd] bg-white px-3 py-1" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><strong className="text-sm">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong><button type="button" aria-label="Next month" className="rounded border border-[#ddd] bg-white px-3 py-1" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div>
+    <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-gray-500">{"SMTWTFS".split("").map((d, i) => <span key={i}>{d}</span>)}</div>
+    <div className="mt-1 grid grid-cols-7 gap-1 touch-pan-y" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
+      {cells.map(date => { const active = dates.includes(date); const outside = new Date(`${date}T12:00:00Z`).getUTCMonth() !== month.getMonth(); const disabled = date < today || date > last; return <button key={date} data-date={date} type="button" disabled={disabled} aria-label={date} aria-pressed={active} className={`h-9 rounded border text-xs font-bold touch-none ${active ? "border-[#0a77b2] bg-[#1498e0] text-white" : outside ? "border-transparent bg-white text-gray-400" : "border-[#d4dce7] bg-[#dbe8f8] text-black hover:border-[#1498e0]"} disabled:opacity-30`} onPointerDown={e => begin(e, date)} onClick={e => { if (e.detail === 0) onChange(active ? dates.filter(d => d !== date) : [...dates, date].sort()); }}>{Number(date.slice(-2))}</button>; })}
+    </div>
+    <p className="mt-3 text-xs text-gray-500">Click or drag dates to select · {dates.length} of 14 selected</p>
+  </div>;
+}
+
 export function PollCreate() { return <Gate><PollCreateContent /></Gate>; }
 function PollCreateContent() {
   const create = client.useMutation("createPoll");
   const [title, setTitle] = useState("");
   const [dates, setDates] = useState<string[]>([]);
-  const [date, setDate] = useState("");
   const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC");
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(17);
-  const [duration, setDuration] = useState(60);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(e: Event) {
-    e.preventDefault(); setError(""); setBusy(true);
-    try { const id = await create({ title, dates: JSON.stringify(dates), zone, startHour, endHour, duration }); window.location.assign(`/polls/${id}`); }
+    e.preventDefault(); setBusy(true); setError("");
+    try { const id = await create({ title, dates: JSON.stringify(dates), zone, startHour, endHour }); window.location.assign(`/polls/${id}`); }
     catch (err) { setError(err instanceof Error ? err.message : "Could not create poll"); setBusy(false); }
   }
-  const input = "w-full rounded border border-[#b9c9c5] bg-white px-3 py-2 text-base outline-none focus:border-[#327c79]";
-  return <Shell><div className="max-w-2xl"><p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#bd6040]">New group poll</p><h1 className="mb-8 text-4xl font-bold">Which days could work?</h1><form onSubmit={e => void submit(e)} className="space-y-6 rounded border border-[#d4dcd7] bg-white p-5 shadow-sm sm:p-8"><label className="block font-bold">Event name<input className={`${input} mt-2`} value={title} maxLength={100} placeholder="Team catch-up" onInput={e => setTitle(e.currentTarget.value)} required /></label><div><label className="block font-bold" for="poll-date">Candidate dates</label><div className="mt-2 flex gap-2"><input id="poll-date" type="date" className={input} value={date} onInput={e => setDate(e.currentTarget.value)} /><button type="button" className="shrink-0 rounded bg-[#dcebe4] px-4 font-bold" onClick={() => { if (date && !dates.includes(date) && dates.length < 14) setDates([...dates, date].sort()); }}>Add date</button></div><div className="mt-3 flex flex-wrap gap-2">{dates.map(d => <button key={d} type="button" className="rounded bg-[#173b46] px-3 py-1.5 text-sm text-white" onClick={() => setDates(dates.filter(x => x !== d))}>{d} ×</button>)}</div><p className="mt-2 text-xs text-[#65747a]">Choose up to 14 dates within the next year.</p></div><label className="block font-bold">Poll time zone<select className={`${input} mt-2`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-2"><label className="font-bold">From<select className={`${input} mt-2`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2,"0")}:00</option>)}</select></label><label className="font-bold">Until<select className={`${input} mt-2`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i+1}>{String(i+1).padStart(2,"0")}:00</option>)}</select></label></div><label className="block font-bold">Meeting length<select className={`${input} mt-2`} value={duration} onChange={e => setDuration(Number(e.currentTarget.value))}>{[15,30,60,90,120].map(n => <option value={n}>{n} minutes</option>)}</select></label>{error && <p role="alert" className="text-[#aa4932]">{error}</p>}<button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className="rounded bg-[#d66b41] px-6 py-3 font-bold text-white disabled:opacity-50">{busy ? "Creating…" : "Create and share →"}</button></form></div></Shell>;
+  return <Shell>
+    <h1 className="mb-1 text-2xl font-bold">Create a group poll</h1><p className="mb-5 text-sm text-gray-500">Pick possible dates and times, then share the link.</p>
+    <form onSubmit={e => void submit(e)} className="space-y-5">
+      <label className="block max-w-[430px] text-sm font-bold">Event name<input className={`${control} mt-1 w-full`} value={title} maxLength={100} placeholder="Team catch-up" onInput={e => setTitle(e.currentTarget.value)} required /></label>
+      <div><h2 className="mb-2 text-sm font-bold">What dates might work?</h2><Calendar dates={dates} onChange={setDates} /></div>
+      <div><h2 className="mb-2 text-sm font-bold">What times might work?</h2><div className="flex flex-wrap gap-3"><label className="text-xs font-bold">No earlier than<select className={`${control} mt-1 block`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2, "0")}:00</option>)}</select></label><label className="text-xs font-bold">No later than<select className={`${control} mt-1 block`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i + 1}>{String(i + 1).padStart(2, "0")}:00</option>)}</select></label><label className="text-xs font-bold">Time zone<select className={`${control} mt-1 block max-w-[230px]`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label></div></div>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      <button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className={primary}>{busy ? "Creating…" : "Create event →"}</button>
+    </form>
+  </Shell>;
 }
+
+function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }: { poll: Poll; dates: string[]; zone: string; selected?: Set<number>; counts?: number[]; people?: { name: string; chosen: Set<number> }[]; editable?: boolean; onPaint?: (index: number, add: boolean) => void }) {
+  const perDay = (poll.endHour - poll.startHour) * 4;
+  const rows = Array.from({ length: perDay }, (_, i) => i);
+  const slots = useMemo(() => dates.map(date => rows.map(row => timestamp(date, poll.startHour * 60 + row * 15, poll.zone))), [poll.dates, poll.zone, poll.startHour, poll.endHour]);
+  const drag = useRef<{ anchor: number; add: boolean; touched: Set<number> } | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const max = people?.length || 0;
+  function touch(index: number) { const d = drag.current; if (!d || !onPaint) return; const firstCol = Math.floor(d.anchor / perDay); const lastCol = Math.floor(index / perDay); const firstRow = d.anchor % perDay; const lastRow = index % perDay; for (let col = Math.min(firstCol, lastCol); col <= Math.max(firstCol, lastCol); col++) { for (let row = Math.min(firstRow, lastRow); row <= Math.max(firstRow, lastRow); row++) { const candidate = col * perDay + row; if (!d.touched.has(candidate)) { d.touched.add(candidate); onPaint(candidate, d.add); } } } }
+  function move(e: PointerEvent) {
+    if (!drag.current) return;
+    const index = (document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]") as HTMLElement | null)?.dataset.slot;
+    if (index !== undefined) touch(Number(index));
+  }
+  return <div className="min-w-0 overflow-x-auto rounded border border-[#d3d3d3] bg-white shadow-sm"><div className="min-w-max select-none" style={{ width: "100%", minWidth: 58 + dates.length * 65 }} onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
+    <div className="grid border-b border-[#c5d4e6] bg-[#f7f9fc]" style={{ gridTemplateColumns: `58px repeat(${dates.length}, minmax(65px, 1fr))` }}><span className="border-r border-[#ddd]" />{dates.map(d => <div key={d} className="border-r border-[#ddd] px-1 py-2 text-center text-[11px] font-bold"><span className="block">{new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short" })}</span>{new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>)}</div>
+    {rows.map(row => <div key={row} className="grid" style={{ gridTemplateColumns: `58px repeat(${dates.length}, minmax(65px, 1fr))` }}><div className={`h-[15px] border-r border-[#ddd] pr-1 text-right text-[10px] leading-[15px] text-gray-600 ${row % 4 === 0 ? "border-t border-[#aab9c9]" : ""}`}>{row % 4 === 0 ? format(slots[0][row], zone, { hour: "numeric" }) : ""}</div>{dates.map((date, col) => { const index = col * perDay + row; const count = counts?.[index] || 0; const active = selected?.has(index) || false; const ts = slots[col][row]; const bg = counts ? count ? `hsl(103 62% ${92 - 46 * count / Math.max(max, 1)}%)` : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8"; return <button key={date} data-slot={index} type="button" disabled={!editable && !counts} aria-label={`${format(ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, ${counts ? `${count} of ${max} available` : active ? "available" : "unavailable"}`} aria-pressed={editable ? active : undefined} className={`h-[15px] border-r border-[#cad6e0] ${row % 4 === 0 ? "border-t border-[#aab9c9]" : "border-t border-[#e3e9f0]"} ${editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default"}`} style={{ backgroundColor: bg }} onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { anchor: index, add: !active, touched: new Set([index]) }; (e.currentTarget.parentElement?.parentElement as HTMLElement)?.setPointerCapture(e.pointerId); onPaint(index, !active); }} onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); }} onPointerEnter={() => setHover(index)} onPointerLeave={() => setHover(null)} />; })}</div>)}
+    {counts && hover !== null && <p className="sticky bottom-0 border-t border-[#ddd] bg-white px-2 py-1 text-xs">{counts[hover]} of {max} free · {people?.filter(p => p.chosen.has(hover)).map(p => p.name).join(", ") || "No one yet"}</p>}
+  </div></div>;
+}
+
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
 function PollPageContent() {
   const { id } = useParams<{ id: string }>();
   const data = client.useQuery("poll", id);
-  if (data === undefined) return <Shell><p>Loading poll…</p></Shell>;
-  if (!data) return <Shell><h1 className="text-3xl">Poll not found</h1><Link to="/polls" className="underline">Back to polls</Link></Shell>;
+  if (data === undefined) return <Shell><p className="text-sm">Loading poll…</p></Shell>;
+  if (!data) return <Shell><h1 className="text-xl font-bold">Poll not found</h1><Link to="/polls" className="text-blue-600 underline">Back to polls</Link></Shell>;
   return <PollDetail key={id} data={data} id={id} />;
 }
-function PollDetail({ data, id }: { data: any; id: string }) {
+function PollDetail({ data, id }: { data: PollData; id: string }) {
   const { poll, responses } = data;
   const save = client.useMutation("saveResponse");
   const mine = responses.find(r => r.isMine);
   const [name, setName] = useState(mine?.name || "");
+  const [joined, setJoined] = useState(Boolean(mine));
   const [selected, setSelected] = useState<number[]>(() => mine ? JSON.parse(mine.slots) : []);
   const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || poll.zone);
+  const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const [focusIndex, setFocusIndex] = useState<number | null>(null);
-  const drag = useRef<{ add: boolean; touched: Set<number> } | null>(null);
-  const days = useMemo(() => slotsFor(poll), [poll.dates, poll.zone, poll.startHour, poll.endHour]);
-  const perDay = (poll.endHour - poll.startHour) * 4;
-  const responseSlots = responses.map(r => ({ ...r, chosen: new Set(JSON.parse(r.slots) as number[]) }));
-  const counts = Array.from({ length: days.length * perDay }, (_, i) => responseSlots.reduce((n, r) => n + (r.chosen.has(i) ? 1 : 0), 0));
-  const selectedSet = new Set(selected);
   const dates = JSON.parse(poll.dates) as string[];
-  const durationSlots = poll.duration / 15;
-  const suggestions = days.flatMap((day, di) => day.map((ts, si) => ({ ts, index: di * perDay + si, count: Math.min(...counts.slice(di * perDay + si, di * perDay + si + durationSlots)) })).filter((window, si) => si + durationSlots <= perDay && day.slice(si, si + durationSlots).every((t, n) => t === window.ts + n * 900000))).sort((a,b) => b.count - a.count || a.ts - b.ts).slice(0, 5);
-  function paint(index: number, add: boolean) { setSelected(old => add ? old.includes(index) ? old : [...old, index] : old.filter(x => x !== index)); setStatus(""); }
-  function cellAt(e: PointerEvent) { const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]"); return el ? Number((el as HTMLElement).dataset.slot) : null; }
-  function move(e: PointerEvent) { const d = drag.current; if (!d) return; const index = cellAt(e); if (index !== null && !d.touched.has(index)) { d.touched.add(index); paint(index, d.add); } }
-  async function submit(e: Event) { e.preventDefault(); setBusy(true); setStatus(""); try { await save(id, name, JSON.stringify(selected)); setStatus("Availability saved"); } catch (err) { setStatus(err instanceof Error ? err.message : "Could not save"); } finally { setBusy(false); } }
+  const perDay = (poll.endHour - poll.startHour) * 4;
+  const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })), [responses]);
+  const counts = Array.from({ length: dates.length * perDay }, (_, i) => people.reduce((count, person) => count + (person.chosen.has(i) ? 1 : 0), 0));
+  useEffect(() => {
+    if (!joined || !dirty || !name.trim()) return;
+    const timer = setTimeout(() => { setStatus("Saving…"); void save(id, name, JSON.stringify(selected)).then(() => { setDirty(false); setStatus("Saved"); }).catch(err => setStatus(err instanceof Error ? err.message : "Could not save")); }, 600);
+    return () => clearTimeout(timer);
+  }, [joined, dirty, name, selected.join(","), id]);
+  async function join(e: Event) { e.preventDefault(); setBusy(true); setStatus(""); try { await save(id, name, JSON.stringify(selected)); setJoined(true); setStatus("Saved. Paint the grid to add your availability."); } catch (err) { setStatus(err instanceof Error ? err.message : "Could not join"); } finally { setBusy(false); } }
+  function paint(index: number, add: boolean) { setSelected(old => add ? old.includes(index) ? old : [...old, index] : old.filter(i => i !== index)); setDirty(true); setStatus("Unsaved changes"); }
   async function copy() { try { await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}`); setStatus("Link copied"); } catch { setStatus("Copy the page URL to share this poll"); } }
-  return <Shell><div className="mb-7 flex flex-wrap items-start justify-between gap-5"><div><p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#bd6040]">Shared availability</p><h1 className="text-4xl font-bold">{poll.title}</h1><p className="mt-2 text-sm text-[#65747a]">{dates.length} dates · {responses.length} participants · {poll.duration} minute meeting</p></div><button className="rounded border border-[#9bb9ad] bg-white px-4 py-2 font-bold" onClick={() => void copy()}>Copy invite link</button></div><div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_280px]"><section className="min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Your availability</h2><p className="text-sm text-[#65747a]">Tap or drag to mark times you can attend.</p></div><label className="text-sm">View in <select className="ml-1 rounded border border-[#b9c9c5] bg-white p-2" value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label></div><div className="overflow-x-auto rounded border border-[#cbd5cf] bg-white"><div className="flex min-w-max select-none" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>{days.map((day, di) => <div key={dates[di]} className="w-36 border-r border-[#dbe2dd] last:border-r-0"><div className="sticky top-0 border-b border-[#dbe2dd] bg-[#e8f0e9] p-2 text-center text-sm font-bold">{fmt(day[0], poll.zone, { weekday: "short", month: "short", day: "numeric" })}</div>{day.map((ts, si) => { const index = di * perDay + si; const count = counts[index]; const active = selectedSet.has(index); return <button key={index} data-slot={index} type="button" aria-label={`${fmt(ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, ${count} available${active ? ", selected" : ""}`} aria-pressed={active} className={`flex h-7 w-full items-center justify-between border-b border-[#edf0ec] px-2 text-left text-xs touch-none ${active ? "bg-[#257b74] font-bold text-white" : count ? "bg-[#e3f0dc] hover:bg-[#c7e5c2]" : "hover:bg-[#f0f2ed]"}`} onPointerDown={e => { if (e.pointerType === "mouse" && e.button !== 0) return; const add = !active; drag.current = { add, touched: new Set([index]) }; (e.currentTarget.parentElement?.parentElement as HTMLElement)?.setPointerCapture(e.pointerId); paint(index, add); }} onClick={e => { if (e.detail === 0) paint(index, !active); }}><span>{fmt(ts, zone, { hour: "numeric", minute: "2-digit" })}</span><span>{count || ""}</span></button>; })}</div>)}</div></div><p className="mt-2 text-xs text-[#65747a]">Darker cells are yours. Numbers show how many participants are free. Dates follow {poll.zone}; labels display in {zone}.</p><form onSubmit={e => void submit(e)} className="mt-5 flex flex-wrap items-end gap-3"><label className="min-w-48 flex-1 text-sm font-bold">Your name<input className="mt-1 w-full rounded border border-[#b9c9c5] bg-white px-3 py-2" value={name} maxLength={50} onInput={e => setName(e.currentTarget.value)} required /></label><button disabled={busy} className="rounded bg-[#d66b41] px-5 py-2.5 font-bold text-white disabled:opacity-50">{busy ? "Saving…" : mine ? "Update availability" : "Save availability"}</button></form>{status && <p role="status" className="mt-3 text-sm font-bold">{status}</p>}</section><aside className="space-y-5"><div className="rounded border border-[#cbd5cf] bg-white p-5"><h2 className="mb-3 text-lg font-bold">Best windows</h2>{suggestions.length ? suggestions.map((s, i) => <button key={i} type="button" onClick={() => setFocusIndex(s.index)} className={`block w-full border-t border-[#e3e9e3] py-2 text-left text-sm ${focusIndex === s.index ? "text-[#b65130]" : ""}`}><strong className="block">{fmt(s.ts, zone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</strong><span className="text-[#65747a]">{s.count} of {responses.length} free for {poll.duration} min</span></button>) : <p className="text-sm text-[#65747a]">No windows yet.</p>}{focusIndex !== null && <div className="mt-3 border-t border-[#d9e3dd] pt-3 text-sm"><strong>Available for this window</strong><p className="mt-1 text-[#65747a]">{responseSlots.filter(r => Array.from({ length: durationSlots }, (_, i) => focusIndex + i).every(i => r.chosen.has(i))).map(r => r.name).join(", ") || "No one yet"}</p></div>}</div><div className="rounded border border-[#cbd5cf] bg-white p-5"><h2 className="mb-3 text-lg font-bold">Participants</h2>{responses.length ? <ul className="space-y-2 text-sm">{responses.map(r => <li key={r.id} className="flex justify-between gap-2"><span>{r.name}{r.isMine ? " (you)" : ""}</span><span className="text-[#65747a]">{(JSON.parse(r.slots) as number[]).length} slots</span></li>)}</ul> : <p className="text-sm text-[#65747a]">Share the link to invite people.</p>}</div></aside></div></Shell>;
+  return <Shell>
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-bold">{poll.title}</h1><p className="mt-1 text-xs text-gray-500">{dates.length} dates · {responses.length} participants · {poll.zone}</p></div><button type="button" className={primary} onClick={() => void copy()}>Copy invite link</button></div>
+    <div className="mb-4 flex flex-wrap items-end gap-3 rounded border border-[#ddd] bg-[#f7f9fc] p-3"><form onSubmit={e => void join(e)} className="flex flex-wrap items-end gap-2"><label className="text-xs font-bold">Your name<input className={`${control} mt-1 block w-44`} value={name} maxLength={50} onInput={e => { setName(e.currentTarget.value); if (joined) setDirty(true); }} required /></label>{!joined && <button className="rounded border border-[#d0a33b] bg-[#f5c04e] px-4 py-2 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join poll"}</button>}</form><label className="text-xs font-bold">View time zone<select className={`${control} mt-1 block max-w-[210px]`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label><span role="status" className="pb-2 text-xs text-gray-500">{status || (joined ? "Changes save automatically" : "Enter your name to start")}</span></div>
+    <div className="grid gap-4 lg:grid-cols-2"><section className="min-w-0"><h2 className="mb-1 text-base font-bold">Your availability</h2><p className="mb-2 text-xs text-gray-500">{joined ? "Click or drag to paint available times. Changes save automatically." : "Join the poll to paint your availability."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section><section className="min-w-0"><h2 className="mb-1 text-base font-bold">Group availability</h2><p className="mb-2 text-xs text-gray-500">Darker green means more people can attend. Hover to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-2 flex items-center gap-2 text-xs text-gray-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section></div>
+    <p className="mt-4 text-xs text-gray-500">Grid dates follow {poll.zone}. Time labels are shown in {zone}. Share the link to collect more responses.</p>
+  </Shell>;
 }
-
-
-

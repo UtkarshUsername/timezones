@@ -6,7 +6,9 @@ Compare a time range across cities, or create a group availability poll.
 
 ## Group polls
 
-Open **Group polls** to create an event with up to 14 candidate dates, a daily time range, a time zone, and a meeting duration. Share the poll URL. Each participant can mark 15-minute slots and update their own response from the same browser session. The results show availability counts and the best continuous windows. Poll links are accessible to anyone who has the URL; guest sessions protect each person's edits.
+Open **Group polls** to create an event. Click or drag across the calendar to choose up to 14 dates, set a daily time range, then share the poll URL. Participants join with a name and paint 15-minute availability slots. Changes save automatically. The group grid uses a green gradient to show how many people are free, and hovering a slot shows who can attend.
+
+Poll links are accessible to anyone who has the URL; guest sessions protect each person's edits.
 
 ## Development
 

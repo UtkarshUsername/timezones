@@ -32,15 +32,15 @@ export default capsule({
     })
   },
   mutations: {
-    createPoll: mutation(async (ctx, input: { title: string; dates: string; zone: string; startHour: number; endHour: number; duration: number }) => {
+    createPoll: mutation(async (ctx, input: { title: string; dates: string; zone: string; startHour: number; endHour: number }) => {
       const { userId } = ctx.auth.requireIdentity();
       const title = input.title.trim().slice(0, 100);
       const dates = parseDates(input.dates);
       if (!title || typeof input.zone !== "string" || input.zone.length > 80) throw new Error("Invalid poll");
       try { new Intl.DateTimeFormat("en", { timeZone: input.zone }); } catch { throw new Error("Invalid time zone"); }
-      if (!Number.isInteger(input.startHour) || !Number.isInteger(input.endHour) || input.startHour < 0 || input.endHour > 24 || input.endHour <= input.startHour || ![15, 30, 60, 90, 120].includes(input.duration)) throw new Error("Invalid time range or duration");
+      if (!Number.isInteger(input.startHour) || !Number.isInteger(input.endHour) || input.startHour < 0 || input.endHour > 24 || input.endHour <= input.startHour) throw new Error("Invalid time range");
       if (dates.some(d => Date.parse(d) < Date.now() - 86_400_000 || Date.parse(d) > Date.now() + 366 * 86_400_000)) throw new Error("Dates must be within the next year");
-      const poll = await ctx.db.polls.insert({ title, dates: JSON.stringify(dates), zone: input.zone, startHour: input.startHour, endHour: input.endHour, duration: input.duration, ownerId: userId });
+      const poll = await ctx.db.polls.insert({ title, dates: JSON.stringify(dates), zone: input.zone, startHour: input.startHour, endHour: input.endHour, duration: 15, ownerId: userId });
       return poll.id;
     }),
     saveResponse: mutation(async (ctx, pollId: string, name: string, rawSlots: string) => {
