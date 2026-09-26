@@ -78,6 +78,7 @@ function PollDetail({ data, id }: { data: any; id: string }) {
   const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || poll.zone);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const drag = useRef<{ add: boolean; touched: Set<number> } | null>(null);
   const days = useMemo(() => slotsFor(poll), [poll.dates, poll.zone, poll.startHour, poll.endHour]);
   const perDay = (poll.endHour - poll.startHour) * 4;
@@ -86,7 +87,7 @@ function PollDetail({ data, id }: { data: any; id: string }) {
   const selectedSet = new Set(selected);
   const dates = JSON.parse(poll.dates) as string[];
   const durationSlots = poll.duration / 15;
-  const suggestions = days.flatMap((day, di) => day.map((ts, si) => ({ ts, index: di * perDay + si, count: Math.min(...counts.slice(di * perDay + si, di * perDay + si + durationSlots)) })).filter((x, si) => si + durationSlots <= perDay && day.slice(si, si + durationSlots).every((t, n) => t === ts + n * 900000))).sort((a,b) => b.count - a.count || a.ts - b.ts).slice(0, 5);
+  const suggestions = days.flatMap((day, di) => day.map((ts, si) => ({ ts, index: di * perDay + si, count: Math.min(...counts.slice(di * perDay + si, di * perDay + si + durationSlots)) })).filter((window, si) => si + durationSlots <= perDay && day.slice(si, si + durationSlots).every((t, n) => t === window.ts + n * 900000))).sort((a,b) => b.count - a.count || a.ts - b.ts).slice(0, 5);
   function paint(index: number, add: boolean) { setSelected(old => add ? old.includes(index) ? old : [...old, index] : old.filter(x => x !== index)); setStatus(""); }
   function cellAt(e: PointerEvent) { const el = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]"); return el ? Number((el as HTMLElement).dataset.slot) : null; }
   function move(e: PointerEvent) { const d = drag.current; if (!d) return; const index = cellAt(e); if (index !== null && !d.touched.has(index)) { d.touched.add(index); paint(index, d.add); } }
