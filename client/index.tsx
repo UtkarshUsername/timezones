@@ -183,7 +183,15 @@ export function App() {
     const s = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
     let e: number;
     try { e = zonedTimestamp(planner.date, planner.end, planner.sourceZone); } catch { e = s + 3600_000; }
-    if (e <= s) e += 86_400_000;
+    if (e <= s) {
+      if (timeInput(s, planner.sourceZone) !== planner.start && timeInput(s, planner.sourceZone) === planner.end) {
+        e = s + 3600_000;
+      } else {
+        const [y, mo, d] = planner.date.split("-").map(Number);
+        const nextDate = new Date(Date.UTC(y, mo - 1, d + 1)).toISOString().slice(0, 10);
+        e = zonedTimestamp(nextDate, planner.end, planner.sourceZone);
+      }
+    }
     return { start: s, end: e };
   }, [planner.date, planner.end, planner.sourceZone, planner.start, planner.startTs, planner.endTs]);
 
