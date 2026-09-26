@@ -85,7 +85,8 @@ function Calendar({ dates, onChange }: { dates: string[]; onChange: (dates: stri
   const last = dateKey(Date.now() + 366 * DAY);
   const start = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
   const first = Date.UTC(month.getFullYear(), month.getMonth(), 1 - start);
-  const cells = Array.from({ length: 42 }, (_, i) => dateKey(first + i * DAY));
+  const cellCount = Math.ceil((start + new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()) / 7) * 7;
+  const cells = Array.from({ length: cellCount }, (_, i) => dateKey(first + i * DAY));
   function select(date: string, state: NonNullable<typeof drag.current>) {
     const span = dateRange(state.anchor, date);
     if (span.length > 14) return;
@@ -103,13 +104,13 @@ function Calendar({ dates, onChange }: { dates: string[]; onChange: (dates: stri
     const date = (document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-date]") as HTMLElement | null)?.dataset.date;
     if (date && date >= today && date <= last) select(date, drag.current);
   }
-  return <div className="max-w-[430px] rounded border border-[#d3d3d3] bg-[#f7f9fc] p-3">
-    <div className="mb-3 flex items-center justify-between gap-2"><button type="button" aria-label="Previous month" className="rounded border border-[#ddd] bg-white px-3 py-1" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><strong className="text-sm">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong><button type="button" aria-label="Next month" className="rounded border border-[#ddd] bg-white px-3 py-1" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div>
-    <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-gray-500">{"SMTWTFS".split("").map((d, i) => <span key={i}>{d}</span>)}</div>
-    <div className="mt-1 grid grid-cols-7 gap-1 touch-pan-y" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
-      {cells.map(date => { const active = dates.includes(date); const outside = new Date(`${date}T12:00:00Z`).getUTCMonth() !== month.getMonth(); const disabled = date < today || date > last; return <button key={date} data-date={date} type="button" disabled={disabled} aria-label={date} aria-pressed={active} className={`h-9 rounded border text-xs font-bold touch-none ${active ? "border-[#0a77b2] bg-[#1498e0] text-white" : outside ? "border-transparent bg-white text-gray-400" : "border-[#d4dce7] bg-[#dbe8f8] text-black hover:border-[#1498e0]"} disabled:opacity-30`} onPointerDown={e => begin(e, date)} onClick={e => { if (e.detail === 0) onChange(active ? dates.filter(d => d !== date) : [...dates, date].sort()); }}>{Number(date.slice(-2))}</button>; })}
+  return <div className="rounded-lg border border-[#d9e2ec] bg-[#f7f9fc] p-3 sm:p-4">
+    <div className="mb-3 flex items-center justify-between gap-2"><button type="button" aria-label="Previous month" className="h-9 w-9 rounded-lg border border-[#d9e2ec] bg-white text-base hover:border-[#1498e0]" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><strong className="text-[15px]">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong><button type="button" aria-label="Next month" className="h-9 w-9 rounded-lg border border-[#d9e2ec] bg-white text-base hover:border-[#1498e0]" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div>
+    <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">{"SMTWTFS".split("").map((d, i) => <span key={i}>{d}</span>)}</div>
+    <div className="mt-2 grid grid-cols-7 gap-1 touch-pan-y" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
+      {cells.map(date => { const active = dates.includes(date); const outside = new Date(`${date}T12:00:00Z`).getUTCMonth() !== month.getMonth(); const disabled = date < today || date > last; return <button key={date} data-date={date} type="button" disabled={disabled} aria-label={date} aria-pressed={active} className={`h-9 rounded-md border text-xs font-bold touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1498e0] ${active ? "border-[#0879bc] bg-[#1498e0] text-white" : outside ? "border-transparent bg-white text-gray-400" : "border-[#d4dce7] bg-[#e8f0f9] text-slate-800 hover:border-[#1498e0] hover:bg-[#dbe8f8]"} disabled:opacity-30`} onPointerDown={e => begin(e, date)} onClick={e => { if (e.detail === 0) onChange(active ? dates.filter(d => d !== date) : [...dates, date].sort()); }}>{Number(date.slice(-2))}</button>; })}
     </div>
-    <p className="mt-3 text-xs text-gray-500">Click or drag dates to select · {dates.length} of 14 selected</p>
+    <p className="mt-3 text-xs text-slate-500">Click or drag to select · <span className="font-bold text-slate-700">{dates.length} of 14 dates</span></p>
   </div>;
 }
 
@@ -129,14 +130,18 @@ function PollCreateContent() {
     catch (err) { setError(err instanceof Error ? err.message : "Could not create poll"); setBusy(false); }
   }
   return <Shell>
-    <h1 className="mb-1 text-2xl font-bold">Create a group poll</h1><p className="mb-5 text-sm text-gray-500">Pick possible dates and times, then share the link.</p>
-    <form onSubmit={e => void submit(e)} className="space-y-5">
-      <label className="block max-w-[430px] text-sm font-bold">Event name<input className={`${control} mt-1 w-full`} value={title} maxLength={100} placeholder="Team catch-up" onInput={e => setTitle(e.currentTarget.value)} required /></label>
-      <div><h2 className="mb-2 text-sm font-bold">What dates might work?</h2><Calendar dates={dates} onChange={setDates} /></div>
-      <div><h2 className="mb-2 text-sm font-bold">What times might work?</h2><div className="flex flex-wrap gap-3"><label className="text-xs font-bold">No earlier than<select className={`${control} mt-1 block`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2, "0")}:00</option>)}</select></label><label className="text-xs font-bold">No later than<select className={`${control} mt-1 block`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i + 1}>{String(i + 1).padStart(2, "0")}:00</option>)}</select></label><label className="text-xs font-bold">Time zone<select className={`${control} mt-1 block max-w-[230px]`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label></div></div>
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className={primary}>{busy ? "Creating…" : "Create event →"}</button>
-    </form>
+    <div className="mx-auto max-w-[470px] pb-12 pt-2">
+      <Link to="/polls" className="text-xs font-bold text-[#0879bc] hover:underline">← Group polls</Link>
+      <h1 className="mt-4 text-2xl font-bold tracking-tight">Create a group poll</h1>
+      <p className="mt-1 text-sm text-slate-500">Pick possible dates and times, then share the link.</p>
+      <form onSubmit={e => void submit(e)} className="mt-7 space-y-6">
+        <label className="block text-sm font-bold">Event name<input className={`${control} mt-2 w-full py-3`} value={title} maxLength={100} placeholder="Team catch-up" onInput={e => setTitle(e.currentTarget.value)} required /></label>
+        <section><h2 className="mb-2 text-sm font-bold">What dates might work?</h2><Calendar dates={dates} onChange={setDates} /></section>
+        <section><h2 className="mb-3 text-sm font-bold">What times might work?</h2><div className="grid grid-cols-2 gap-3"><label className="min-w-0 text-xs font-bold">No earlier than<select className={`${control} mt-2 w-full`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2, "0")}:00</option>)}</select></label><label className="min-w-0 text-xs font-bold">No later than<select className={`${control} mt-2 w-full`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i + 1}>{String(i + 1).padStart(2, "0")}:00</option>)}</select></label></div><label className="mt-4 block text-xs font-bold">Time zone<select className={`${control} mt-2 w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label>{endHour <= startHour && <p className="mt-2 text-xs text-red-700">Choose an end time after the start time.</p>}</section>
+        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        <button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className={`${primary} w-full py-3`}>{busy ? "Creating…" : "Create poll →"}</button>
+      </form>
+    </div>
   </Shell>;
 }
 
