@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
-type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string };
+type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string; startTs?: number; endTs?: number };
 type Theme = "light" | "dark";
 
 const STORAGE_KEY = "timezones-planner-v1";
@@ -176,12 +176,16 @@ export function App() {
   }, [open]);
 
   const selectedRange = useMemo(() => {
+    if (typeof planner.startTs === "number" && typeof planner.endTs === "number"
+      && Number.isFinite(planner.startTs) && Number.isFinite(planner.endTs) && planner.endTs > planner.startTs) {
+      return { start: planner.startTs, end: planner.endTs };
+    }
     const s = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
     let e: number;
     try { e = zonedTimestamp(planner.date, planner.end, planner.sourceZone); } catch { e = s + 3600_000; }
     if (e <= s) e += 86_400_000;
     return { start: s, end: e };
-  }, [planner.date, planner.end, planner.sourceZone, planner.start]);
+  }, [planner.date, planner.end, planner.sourceZone, planner.start, planner.startTs, planner.endTs]);
 
   const hours = useMemo(() => Array.from({ length: HOURS }, (_, i) => windowStart + i * 3600_000), [windowStart]);
 
@@ -189,11 +193,11 @@ export function App() {
   function goToday() {
     const t = snap15(now);
     setWindowStart(anchorFor(t));
-    update({ date: dateInput(t, planner.sourceZone), start: timeInput(t, planner.sourceZone), end: timeInput(t + 3600_000, planner.sourceZone) });
+    update({ date: dateInput(t, planner.sourceZone), start: timeInput(t, planner.sourceZone), end: timeInput(t + 3600_000, planner.sourceZone), startTs: t, endTs: t + 3600_000 });
   }
   function changeDate(d: string) {
     if (!d) return;
-    update({ date: d });
+    update({ date: d, startTs: undefined, endTs: undefined });
     try { setWindowStart(anchorFor(zonedTimestamp(d, planner.start, planner.sourceZone))); } catch { /* ignore */ }
   }
   function addZone(z: string) {
@@ -204,7 +208,9 @@ export function App() {
   function removeZone(z: string) {
     if (planner.zones.length === 1) return;
     const zones = planner.zones.filter((x) => x !== z);
-    update({ zones, sourceZone: planner.sourceZone === z ? zones[0] : planner.sourceZone });
+    if (planner.sourceZone === z) {
+      update({ zones, sourceZone: zones[0], date: dateInput(selectedRange.start, zones[0]), start: timeInput(selectedRange.start, zones[0]), end: timeInput(selectedRange.end, zones[0]) });
+    } else update({ zones });
   }
   function moveZone(z: string, dir: -1 | 1) {
     const i = planner.zones.indexOf(z);
@@ -217,14 +223,14 @@ export function App() {
   function selectHour(ts: number, zone: string) {
     const t = snap15(ts);
     if (t < windowStart || t >= windowStart + HOURS * 3600_000) setWindowStart(anchorFor(t));
-    update({ sourceZone: zone, date: dateInput(t, zone), start: timeInput(t, zone), end: timeInput(t + 3600_000, zone) });
+    update({ sourceZone: zone, date: dateInput(t, zone), start: timeInput(t, zone), end: timeInput(t + 3600_000, zone), startTs: t, endTs: t + 3600_000 });
   }
   function selectRange(from: number, to: number, zone: string) {
     const s = snap15(Math.min(from, to));
     let e = snap15(Math.max(from, to));
     if (e <= s) e = s + 3600_000;
     if (s < windowStart || e >= windowStart + HOURS * 3600_000) setWindowStart(anchorFor(s));
-    update({ sourceZone: zone, date: dateInput(s, zone), start: timeInput(s, zone), end: timeInput(e, zone) });
+    update({ sourceZone: zone, date: dateInput(s, zone), start: timeInput(s, zone), end: timeInput(e, zone), startTs: s, endTs: e });
   }
   function tsAt(clientX: number, el: HTMLDivElement) {
     const r = el.getBoundingClientRect();
