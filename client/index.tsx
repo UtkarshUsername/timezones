@@ -73,9 +73,17 @@ function zonedTimestamp(date: string, time: string, zone: string) {
   const [y, mo, d] = date.split("-").map(Number);
   const [h, mi] = time.split(":").map(Number);
   const wall = Date.UTC(y, mo - 1, d, h || 0, mi || 0);
-  let ts = wall - offsetMinutes(wall, zone) * 60_000;
-  ts = wall - offsetMinutes(ts, zone) * 60_000;
-  return ts;
+  const offsets = new Set([
+    offsetMinutes(wall - 36 * 3600_000, zone),
+    offsetMinutes(wall, zone),
+    offsetMinutes(wall + 36 * 3600_000, zone),
+  ]);
+  const candidates = [...offsets].map((offset) => wall - offset * 60_000).sort((a, b) => a - b);
+  const requested = `${date}T${time}`;
+  const local = (ts: number) => `${dateInput(ts, zone)}T${timeInput(ts, zone)}`;
+  return candidates.find((ts) => local(ts) === requested)
+    ?? candidates.find((ts) => local(ts) > requested)
+    ?? candidates[candidates.length - 1];
 }
 function gmtLabel(ts: number, zone: string) {
   const mins = offsetMinutes(ts, zone);
