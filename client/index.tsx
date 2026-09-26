@@ -364,7 +364,7 @@ export function App() {
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
             Selected: <b>{selLabel}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
-          <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. Green is now, blue is selected.</span>
+          <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. With a keyboard, use Enter to select an hour or Shift+Enter to extend the range. Green is now, blue is selected.</span>
           <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
             <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(true)} type="button">12h</button>
             <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(false)} type="button">24h</button>
@@ -429,17 +429,21 @@ export function App() {
                             const wd = formatInZone(ts + 3599_999, zone, { weekday: "short" }).toUpperCase();
                             const dm = formatInZone(ts + 3599_999, zone, { day: "numeric", month: "short" }).toUpperCase();
                             return (
-                              <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} bg-[#2e4a5a] text-white`} style={{ width: CELL_W, height: 64 }}>
+                              <button key={ts} type="button" aria-label={`${dateInput(ts, zone)} ${timeInput(ts, zone)} ${gmtLabel(ts, zone)} in ${shortZone(zone)}`}
+                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (e.shiftKey) selectRange(selectedRange.start, ts + 3600_000, zone); else selectHour(ts, zone); } }}
+                                className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} bg-[#2e4a5a] text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`} style={{ width: CELL_W, height: 64 }}>
                                 <span className="text-[15px] font-bold">{wd}</span>
                                 <span className="text-[9px]">{dm}</span>
-                              </div>
+                              </button>
                             );
                           }
                           return (
-                            <div key={ts} className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} ${bg}`} style={{ width: CELL_W, height: 64 }}>
+                            <button key={ts} type="button" aria-label={`${dateInput(ts, zone)} ${timeInput(ts, zone)} ${gmtLabel(ts, zone)} in ${shortZone(zone)}`}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (e.shiftKey) selectRange(selectedRange.start, ts + 3600_000, zone); else selectHour(ts, zone); } }}
+                              className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} ${bg} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`} style={{ width: CELL_W, height: 64 }}>
                               <span className="text-[17px] leading-none">{cellHour}{cellMins !== "00" ? <span className="ml-0.5 align-top text-[10px]">{cellMins}</span> : null}</span>
                               {hour12 ? <span className="pt-0.5 text-[11px] lowercase">{ampm}</span> : null}
-                            </div>
+                            </button>
                           );
                         })}
                         {/* full-height overlays render below, spanning all rows */}
