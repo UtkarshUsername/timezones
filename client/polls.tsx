@@ -147,24 +147,67 @@ function PollCreateContent() {
 
 function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }: { poll: Poll; dates: string[]; zone: string; selected?: Set<number>; counts?: number[]; people?: { name: string; chosen: Set<number> }[]; editable?: boolean; onPaint?: (index: number, add: boolean) => void }) {
   const perDay = (poll.endHour - poll.startHour) * 4;
-  const rows = Array.from({ length: perDay }, (_, i) => i);
-  const slots = useMemo(() => dates.map(date => rows.map(row => timestamp(date, poll.startHour * 60 + row * 15, poll.zone))), [poll.dates, poll.zone, poll.startHour, poll.endHour]);
-  const drag = useRef<{ anchor: number; add: boolean; touched: Set<number> } | null>(null);
+  const slots = useMemo(() => dates.flatMap((date, col) =>
+    Array.from({ length: perDay }, (_, row) => ({
+      index: col * perDay + row,
+      ts: timestamp(date, poll.startHour * 60 + row * 15, poll.zone),
+    }))
+  ), [poll.dates, poll.zone, poll.startHour, poll.endHour]);
+  const days = useMemo(() => {
+    const byDate = new Map<string, typeof slots>();
+    for (const slot of slots) {
+      const date = localParts(slot.ts, zone).slice(0, 10);
+      if (!byDate.has(date)) byDate.set(date, []);
+      byDate.get(date)!.push(slot);
+    }
+    return [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => ({
+      date,
+      items: items.sort((a, b) => a.ts - b.ts),
+    }));
+  }, [slots, zone]);
+  const drag = useRef<{ add: boolean; touched: Set<number> } | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const max = people?.length || 0;
-  function touch(index: number) { const d = drag.current; if (!d || !onPaint) return; const firstCol = Math.floor(d.anchor / perDay); const lastCol = Math.floor(index / perDay); const firstRow = d.anchor % perDay; const lastRow = index % perDay; for (let col = Math.min(firstCol, lastCol); col <= Math.max(firstCol, lastCol); col++) { for (let row = Math.min(firstRow, lastRow); row <= Math.max(firstRow, lastRow); row++) { const candidate = col * perDay + row; if (!d.touched.has(candidate)) { d.touched.add(candidate); onPaint(candidate, d.add); } } } }
+  function touch(index: number) {
+    if (!drag.current || !onPaint || drag.current.touched.has(index)) return;
+    drag.current.touched.add(index);
+    onPaint(index, drag.current.add);
+  }
   function move(e: PointerEvent) {
     if (!drag.current) return;
     const index = (document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]") as HTMLElement | null)?.dataset.slot;
     if (index !== undefined) touch(Number(index));
   }
-  return <div className="min-w-0 overflow-x-auto rounded border border-[#d3d3d3] bg-white shadow-sm"><div className="min-w-max select-none" style={{ width: "100%", minWidth: 58 + dates.length * 65 }} onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
-    <div className="grid border-b border-[#c5d4e6] bg-[#f7f9fc]" style={{ gridTemplateColumns: `58px repeat(${dates.length}, minmax(65px, 1fr))` }}><span className="border-r border-[#ddd]" />{dates.map(d => <div key={d} className="border-r border-[#ddd] px-1 py-2 text-center text-[11px] font-bold"><span className="block">{new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short" })}</span>{new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>)}</div>
-    {rows.map(row => <div key={row} className="grid" style={{ gridTemplateColumns: `58px repeat(${dates.length}, minmax(65px, 1fr))` }}><div className={`h-[15px] border-r border-[#ddd] pr-1 text-right text-[10px] leading-[15px] text-gray-600 ${row % 4 === 0 ? "border-t border-[#aab9c9]" : ""}`}>{row % 4 === 0 ? format(slots[0][row], zone, { hour: "numeric" }) : ""}</div>{dates.map((date, col) => { const index = col * perDay + row; const count = counts?.[index] || 0; const active = selected?.has(index) || false; const ts = slots[col][row]; const bg = counts ? count ? `hsl(103 62% ${92 - 46 * count / Math.max(max, 1)}%)` : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8"; return <button key={date} data-slot={index} type="button" disabled={!editable && !counts} aria-label={`${format(ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, ${counts ? `${count} of ${max} available` : active ? "available" : "unavailable"}`} aria-pressed={editable ? active : undefined} className={`h-[15px] border-r border-[#cad6e0] ${row % 4 === 0 ? "border-t border-[#aab9c9]" : "border-t border-[#e3e9f0]"} ${editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default"}`} style={{ backgroundColor: bg }} onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { anchor: index, add: !active, touched: new Set([index]) }; (e.currentTarget.parentElement?.parentElement as HTMLElement)?.setPointerCapture(e.pointerId); onPaint(index, !active); }} onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); }} onPointerEnter={() => setHover(index)} onPointerLeave={() => setHover(null)} />; })}</div>)}
-    {counts && hover !== null && <p className="sticky bottom-0 border-t border-[#ddd] bg-white px-2 py-1 text-xs">{counts[hover]} of {max} free · {people?.filter(p => p.chosen.has(hover)).map(p => p.name).join(", ") || "No one yet"}</p>}
-  </div></div>;
+  return <div className="min-w-0 overflow-x-auto rounded border border-[#d3d3d3] bg-white shadow-sm">
+    <div data-grid className="flex min-w-full select-none" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
+      {days.map(day => <div key={day.date} className="min-w-[120px] flex-1 border-r border-[#d3d3d3]">
+        <div className="flex h-10 items-center justify-center border-b border-[#c5d4e6] bg-[#f7f9fc] px-1 text-center text-[11px] font-bold">
+          {format(day.items[0].ts, zone, { weekday: "short", month: "short", day: "numeric" })}
+        </div>
+        {day.items.map((slot, row) => {
+          const index = slot.index;
+          const count = counts?.[index] || 0;
+          const active = selected?.has(index) || false;
+          const time = localParts(slot.ts, zone).slice(11);
+          const showTime = row === 0 || time.endsWith(":00");
+          const bg = counts ? count ? "hsl(103 62% " + (92 - 46 * count / Math.max(max, 1)) + "%)" : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8";
+          return <div key={index} className={"flex h-[15px] border-t " + (showTime ? "border-[#aab9c9]" : "border-[#e3e9f0]")}>
+            <span className="w-[49px] shrink-0 pr-1 text-right text-[9px] leading-[15px] text-gray-600">{showTime ? format(slot.ts, zone, { hour: "numeric", minute: "2-digit" }) : ""}</span>
+            <button data-slot={index} type="button" disabled={!editable && !counts}
+              aria-label={format(slot.ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ", " + (counts ? count + " of " + max + " available" : active ? "available" : "unavailable")}
+              aria-pressed={editable ? active : undefined}
+              className={"min-w-0 flex-1 border-l border-[#cad6e0] " + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
+              style={{ backgroundColor: bg }}
+              onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
+              onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); }}
+              onPointerEnter={() => setHover(index)} onPointerLeave={() => setHover(null)} />
+          </div>;
+        })}
+      </div>)}
+    </div>
+    {counts && hover !== null && <p className="border-t border-[#ddd] bg-white px-2 py-1 text-xs">{counts[hover]} of {max} free · {people?.filter(p => p.chosen.has(hover)).map(p => p.name).join(", ") || "No one yet"}</p>}
+  </div>;
 }
-
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
 function PollPageContent() {
   const { id } = useParams<{ id: string }>();
@@ -200,6 +243,6 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-bold">{poll.title}</h1><p className="mt-1 text-xs text-gray-500">{dates.length} dates · {responses.length} participants · {poll.zone}</p></div><button type="button" className={primary} onClick={() => void copy()}>Copy invite link</button></div>
     <div className="mb-4 flex flex-wrap items-end gap-3 rounded border border-[#ddd] bg-[#f7f9fc] p-3"><form onSubmit={e => void join(e)} className="flex flex-wrap items-end gap-2"><label className="text-xs font-bold">Your name<input className={`${control} mt-1 block w-44`} value={name} maxLength={50} onInput={e => { setName(e.currentTarget.value); if (joined) setDirty(true); }} required /></label>{!joined && <button className="rounded border border-[#d0a33b] bg-[#f5c04e] px-4 py-2 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join poll"}</button>}</form><label className="text-xs font-bold">View time zone<select className={`${control} mt-1 block max-w-[210px]`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label><span role="status" className="pb-2 text-xs text-gray-500">{status || (joined ? "Changes save automatically" : "Enter your name to start")}</span></div>
     <div className="grid gap-4 lg:grid-cols-2"><section className="min-w-0"><h2 className="mb-1 text-base font-bold">Your availability</h2><p className="mb-2 text-xs text-gray-500">{joined ? "Click or drag to paint available times. Changes save automatically." : "Join the poll to paint your availability."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section><section className="min-w-0"><h2 className="mb-1 text-base font-bold">Group availability</h2><p className="mb-2 text-xs text-gray-500">Darker green means more people can attend. Hover to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-2 flex items-center gap-2 text-xs text-gray-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section></div>
-    <p className="mt-4 text-xs text-gray-500">Grid dates follow {poll.zone}. Time labels are shown in {zone}. Share the link to collect more responses.</p>
+    <p className="mt-4 text-xs text-gray-500">Dates and times are shown in {zone}. Choose another time zone above to view the same availability locally.</p>
   </Shell>;
 }
