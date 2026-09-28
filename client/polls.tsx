@@ -278,13 +278,20 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
       </div>
       <div className="mt-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">{joined ? "Select or drag across times when you can attend." : "Join the poll above to mark your times."}</p>
-          <div className="flex w-full max-w-xs items-center gap-2 text-xs text-slate-500 sm:w-80"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div>
-        </div>
         <div className="grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:gap-6">
-          <section className="min-w-0"><h2 className="mb-3 text-sm font-bold sm:text-lg">Your availability</h2><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
-          <section className="min-w-0 border-t border-slate-200 pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><h2 className="mb-3 text-sm font-bold sm:text-lg">Group availability</h2><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /></section>
+          <section className="min-w-0">
+            <h2 className="text-sm font-bold sm:text-lg">Your availability</h2>
+            <p className="mb-3 mt-1 text-sm text-slate-600">{joined ? "Select or drag to mark your times." : "Join the poll above to mark your times."}</p>
+            <Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} />
+          </section>
+          <section className="min-w-0 border-t border-slate-200 pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-bold sm:text-lg">Group availability</h2>
+              <div className="flex w-40 items-center gap-1.5 text-xs text-slate-500 sm:w-24 md:w-40 lg:w-48"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div>
+            </div>
+            <p className="mb-3 mt-1 text-sm text-slate-600"><span className="hidden sm:inline">Hover over a time to see who's free.</span><span className="sm:hidden">Tap a time to see who's free.</span></p>
+            <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} />
+          </section>
         </div>
       </div>
     </div>
