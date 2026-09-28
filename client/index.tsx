@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { Link, Route, Router, Routes } from "lakebed/client";
+import { PollCreate, PollPage, PollsHome } from "./polls";
 
 type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string; startTs?: number; endTs?: number };
 type Theme = "light" | "dark";
@@ -133,7 +135,7 @@ function anchorFor(ts: number) {
   return Math.floor((ts - 18 * 3600_000) / 3600_000) * 3600_000;
 }
 
-export function App() {
+export function PlannerApp() {
   const [planner, setPlanner] = useState<SavedState>(initialState);
   const [ready, setReady] = useState(false);
   const [theme, setTheme] = useState<Theme>("light");
@@ -334,6 +336,7 @@ export function App() {
   return (
     <main className={`min-h-screen ${dark ? "bg-zinc-950 text-slate-100" : "bg-white text-slate-900"}`} style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
       <div className="mx-auto max-w-[980px] px-3 py-4">
+        <nav className="mb-5 flex items-center justify-between border-b border-slate-200 pb-3 text-sm"><strong className="text-lg tracking-tight">Timezones</strong><Link to="/polls" className="rounded bg-[#1498e0] px-4 py-2 font-bold text-white">Group polls →</Link></nav>
         {/* search */}
         <div className="relative mb-4 flex max-w-[430px] items-stretch" data-search>
           <button
@@ -483,3 +486,9 @@ export function App() {
     </main>
   );
 }
+
+export function App() {
+  return <Router><Routes><Route path="/" element={<PlannerApp />} /><Route path="/polls" element={<PollsHome />} /><Route path="/polls/new" element={<PollCreate />} /><Route path="/polls/:id" element={<PollPage />} /></Routes></Router>;
+}
+
+
