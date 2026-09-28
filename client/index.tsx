@@ -348,7 +348,7 @@ export function PlannerApp() {
             className={`w-full rounded-r border border-[#ddd] px-3 py-2.5 text-[15px] outline-none ${dark ? "bg-zinc-900 text-slate-100" : "bg-white text-slate-800"}`}
             onFocus={() => setOpen(true)}
             onInput={(e) => { setQuery(e.currentTarget.value); setOpen(true); }}
-            placeholder="Search by Location or Timezone name"
+            placeholder="Add a city or time zone"
             value={query}
           />
           {open ? (
@@ -374,7 +374,7 @@ export function PlannerApp() {
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
             Selected: <b>{selLabel}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
-          <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. With a keyboard, use Enter to select an hour or Shift+Enter to extend the range. Green is now, blue is selected.</span>
+          <span className="text-slate-500">Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
           <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
             <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(true)} type="button">12h</button>
             <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(false)} type="button">24h</button>
@@ -477,12 +477,10 @@ export function PlannerApp() {
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#b9cfe8] bg-[#dbe8f8]" />Daytime</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#7ba0b8] bg-[#8fb0c7]" />Morning / evening</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#22394a] bg-[#2e4a5a]" />Night</span>
-          <span className="flex items-center gap-1.5"><span className="flex h-4 items-center rounded-sm border border-[#22394a] bg-[#2e4a5a] px-1 text-[9px] font-bold leading-none text-white">SUN</span>Midnight</span>
         </div>
-        <p className="mt-3 text-[12px] text-gray-500">
-          {fmtTime(selectedRange.start, planner.sourceZone, hour12)}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)} in {shortZone(planner.sourceZone)} is{" "}
-          {planner.zones.map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
-        </p>
+        {planner.zones.some((z) => z !== planner.sourceZone) ? <p className="mt-3 text-sm text-slate-600">
+          In other zones: {planner.zones.filter((z) => z !== planner.sourceZone).map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
+        </p> : null}
       </div>
     </main>
   );
