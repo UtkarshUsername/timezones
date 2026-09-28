@@ -60,6 +60,8 @@ Use the dev server's port if it differs from 3000. Fix compile errors and runtim
 
 ## Deploy and verify
 
+Do not deploy unless the user explicitly asks you to.
+
 After local checks pass, deploy from another terminal:
 
 ```sh
