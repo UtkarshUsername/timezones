@@ -200,10 +200,10 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
         const showTime = row === 0 || minute === 0 || occurrence > 0 || gap > 15;
         const label = new Date(Date.UTC(2000, 0, 1, hour, minute)).toLocaleTimeString("en-US", { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
         return <div key={time} className="grid" style={{ gridTemplateColumns: columns }}>
-          <span className={"h-[15px] border-t border-r border-[#d3d3d3] pr-1 text-right text-[9px] leading-[15px] text-gray-600 " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
+          <span className={"h-6 border-t border-r border-[#d3d3d3] pr-1 text-right text-[9px] leading-6 text-gray-600 sm:h-[15px] sm:leading-[15px] " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
           {days.map(day => {
           const slot = day.byTime.get(time);
-          if (!slot) return <span key={day.date} className="h-[15px] border-t border-r border-[#e3e9f0] bg-[#f7f9fc]" />;
+          if (!slot) return <span key={day.date} className="h-6 border-t border-r border-[#e3e9f0] bg-[#f7f9fc] sm:h-[15px]" />;
           const index = slot.index;
           const count = counts?.[index] || 0;
           const active = selected?.has(index) || false;
@@ -211,7 +211,7 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
           return <button key={day.date} data-slot={index} type="button" disabled={!editable && !counts}
               aria-label={format(slot.ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ", " + (counts ? count + " of " + max + " available" : active ? "available" : "unavailable")}
               aria-pressed={editable ? active : undefined}
-              className={"h-[15px] border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] " + (showTime ? "border-t-[#aab9c9] " : "border-t-[#e3e9f0] ") + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
+              className={"h-6 border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] sm:h-[15px] " + (showTime ? "border-t-[#aab9c9] " : "border-t-[#e3e9f0] ") + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
               style={{ backgroundColor: bg }}
               onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
               onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) setHover(index); }}
@@ -278,9 +278,9 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         </div>
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
       </div>
-      <div className="mt-8 grid grid-cols-2 items-start gap-3 sm:gap-6">
+      <div className="mt-8 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:gap-6">
         <section className="min-w-0"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Your availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">{joined ? "Select or drag across times when you can attend. Changes save automatically." : "Join the poll above to mark your times."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
-        <section className="min-w-0 border-l border-slate-200 pl-3 sm:pl-6"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Group availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
+        <section className="min-w-0 border-t border-slate-200 pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Group availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
       </div>
     </div>
   </Shell>;
