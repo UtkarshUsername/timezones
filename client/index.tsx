@@ -11,7 +11,6 @@ const HOUR12_KEY = "timezones-hour12-v1";
 const CELL_W = 62;
 const CELL_GAP = 3;
 const HOURS = 48;
-const INFO_W = 248;
 const STRIP_W = HOURS * (CELL_W + CELL_GAP);
 const NOW_COLOR = "#52b306";
 const SEL_COLOR = "#1498e0";
@@ -304,7 +303,7 @@ export function PlannerApp() {
   }, [windowStart, planner.zones.length, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selLabel = fmtTime(selectedRange.start, planner.sourceZone, hour12);
-  const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short" });
+  const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
   function spanRange(s: number, e: number, color: string, key: string) {
     const pitch = CELL_W + CELL_GAP;
@@ -318,7 +317,7 @@ export function PlannerApp() {
       <div
         key={key}
         className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
-        style={{ left: INFO_W + l, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: "rgba(20, 152, 224, 0.10)" }}
+        style={{ left: `calc(var(--zone-width) + ${l}px)`, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: "rgba(20, 152, 224, 0.10)" }}
       />
     );
   }
@@ -328,7 +327,7 @@ export function PlannerApp() {
       <div
         key={key}
         className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
-        style={{ left: INFO_W + idx * (CELL_W + CELL_GAP), width: CELL_W, border: `3px solid ${color}` }}
+        style={{ left: `calc(var(--zone-width) + ${idx * (CELL_W + CELL_GAP)}px)`, width: CELL_W, border: `3px solid ${color}` }}
       />
     );
   }
@@ -336,7 +335,7 @@ export function PlannerApp() {
   return (
     <main className={`min-h-screen ${dark ? "bg-zinc-950 text-slate-100" : "bg-white text-slate-900"}`} style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
       <div className="mx-auto max-w-[980px] px-3 py-4">
-        <nav className="mb-5 flex items-center justify-between border-b border-slate-200 pb-3 text-sm"><strong className="text-lg tracking-tight">Timezones</strong><Link to="/polls" className="rounded bg-[#1498e0] px-4 py-2 font-bold text-white">Group polls →</Link></nav>
+        <nav className={`mb-5 flex items-center justify-between border-b pb-3 text-sm ${dark ? "border-zinc-700" : "border-slate-200"}`}><strong className="text-lg tracking-tight">Timezones</strong><Link to="/polls" className="rounded bg-[#1498e0] px-4 py-2 font-bold text-white">Group polls →</Link></nav>
         {/* search */}
         <div className="relative mb-4 flex max-w-[430px] items-stretch" data-search>
           <button
@@ -346,10 +345,10 @@ export function PlannerApp() {
             type="button"
           >+</button>
           <input
-            className={`w-full rounded-r border border-[#ddd] px-3 py-2.5 text-[15px] outline-none ${dark ? "bg-zinc-900 text-slate-100" : "bg-white text-slate-800"}`}
+            className={`w-full rounded-r border border-[#ddd] px-3 py-2.5 text-[15px] outline-none ${dark ? "bg-zinc-900 text-slate-100 placeholder:text-slate-400" : "bg-white text-slate-800 placeholder:text-slate-500"}`}
             onFocus={() => setOpen(true)}
             onInput={(e) => { setQuery(e.currentTarget.value); setOpen(true); }}
-            placeholder="Search by Location or Timezone name"
+            placeholder="Add a city or time zone"
             value={query}
           />
           {open ? (
@@ -373,23 +372,23 @@ export function PlannerApp() {
           <input aria-label="Date" className={`rounded border border-[#ddd] px-2 py-1.5 text-[13px] ${dark ? "bg-zinc-900 [color-scheme:dark]" : "bg-white"}`} type="date" value={planner.date} onInput={(e) => changeDate(e.currentTarget.value)} />
           <button className={`rounded border px-2 py-1.5 font-bold ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc] hover:bg-[#dbe8f8]"}`} onClick={goToday} type="button">Today</button>
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
-            Selected: <b>{selLabel}</b> · {shortZone(planner.sourceZone)} · {selDate}
+            Selected: <b>{selLabel}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
-          <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. With a keyboard, use Enter to select an hour or Shift+Enter to extend the range. Green is now, blue is selected.</span>
-          <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
-            <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(true)} type="button">12h</button>
-            <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(false)} type="button">24h</button>
+          <span className={`basis-full ${dark ? "text-slate-300" : "text-slate-600"}`}>Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
+          <span role="group" aria-label="Time format" className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
+            <button aria-pressed={hour12} className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(true)} type="button">12h</button>
+            <button aria-pressed={!hour12} className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(false)} type="button">24h</button>
           </span>
-          <span className="flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
-            <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setTheme("light")} type="button">Light</button>
-            <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-gray-500"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
+          <span role="group" aria-label="Color theme" className="flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
+            <button aria-pressed={theme === "light"} className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setTheme("light")} type="button">Light</button>
+            <button aria-pressed={theme === "dark"} className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-slate-600"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
           </span>
         </div>
 
         {/* card: one shared horizontal scrollbar for all rows */}
-        <div className={`tzwrap relative overflow-hidden rounded border ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
+        <div className={`tzwrap relative overflow-hidden rounded border [--zone-width:148px] sm:[--zone-width:248px] ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: dark ? "none" : "0 0 5px #d5d5d5" }}>
           <div ref={outerRef} className="overflow-x-auto">
-            <div className="relative" style={{ minWidth: INFO_W + STRIP_W }}>
+            <div className="relative" style={{ minWidth: `calc(var(--zone-width) + ${STRIP_W}px)` }}>
               {planner.zones.map((zone, zi) => {
                 const code = zoneCode(now, zone);
                 const off = gmtLabel(now, zone);
@@ -397,22 +396,23 @@ export function PlannerApp() {
                 const exact = fmtTime(now, zone, hour12);
                 const dateStr = formatInZone(now, zone, { weekday: "short", day: "numeric", month: "short" });
                 return (
-                  <div key={zone} className={`grid${zi > 0 ? ` border-t ${dark ? "border-zinc-700" : "border-[#eee]"}` : ""}`} style={{ gridTemplateColumns: `${INFO_W}px ${STRIP_W}px` }}>
-                    <div className={`sticky left-0 z-20 border-r border-[#eee] px-3 py-2.5 ${dark ? "border-zinc-700 bg-zinc-900" : "bg-white"}`}>
+                  <div key={zone} className={`grid${zi > 0 ? ` border-t ${dark ? "border-zinc-700" : "border-[#eee]"}` : ""}`} style={{ gridTemplateColumns: `var(--zone-width) ${STRIP_W}px` }}>
+                    <div className={`sticky left-0 z-20 border-r border-[#eee] px-2 py-2.5 sm:px-3 ${dark ? "border-zinc-700 bg-zinc-900" : "bg-white"}`}>
                       <p className={`text-[15px] font-bold ${dark ? "text-slate-100" : "text-black"}`}>
-                        <span className={dark ? "text-slate-100" : "text-black"}>{code}</span>{" "}
-                        <span className="ml-1 rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500">{off}</span>
+                        <span className={dark ? "text-slate-100" : "text-black"}>{shortZone(zone)}</span>{" "}
+                        <span className="hidden sm:inline">{code}</span>
+                        <span className="ml-1 hidden rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500 sm:inline">{off}</span>
                       </p>
-                      <p className={`text-[12.5px] leading-tight ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
-                      <p className="mt-2 flex items-start gap-3">
+                      <p className={`hidden text-[12.5px] leading-tight sm:block ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
+                      <p className="mt-2 flex flex-wrap items-start gap-2 sm:flex-nowrap sm:gap-3">
                         <span>
-                          <span className={`block text-[17px] leading-none ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
+                          <span className={`block text-[15px] leading-none sm:text-[17px] ${dark ? "text-slate-100" : "text-black"}`}><span className={`mr-1 text-[11px] font-bold uppercase ${dark ? "text-slate-300" : "text-slate-600"}`}>Now</span>{exact}</span>
                           <span className={`block pt-0.5 text-[12.5px] ${dark ? "text-slate-300" : "text-black"}`}>{dateStr}</span>
                         </span>
-                        <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-gray-400">
-                          <button aria-label={`Move ${code} up`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, -1)} type="button">↑</button>
-                          <button aria-label={`Move ${code} down`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, 1)} type="button">↓</button>
-                          {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 sm:ml-auto">
+                          <button aria-label={`Move ${shortZone(zone)} up`} disabled={zi === 0} className="rounded border border-[#ddd] px-2 py-1.5 hover:text-black disabled:opacity-40" onClick={() => moveZone(zone, -1)} type="button">↑</button>
+                          <button aria-label={`Move ${shortZone(zone)} down`} disabled={zi === planner.zones.length - 1} className="rounded border border-[#ddd] px-2 py-1.5 hover:text-black disabled:opacity-40" onClick={() => moveZone(zone, 1)} type="button">↓</button>
+                          {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-2 py-1.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
                         </span>
                       </p>
                     </div>
@@ -470,18 +470,17 @@ export function PlannerApp() {
             </div>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-gray-500">
+        <p className={`mt-2 text-sm sm:hidden ${dark ? "text-slate-300" : "text-slate-600"}`}>Scroll the timeline to see more hours →</p>
+        <div className={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm bg-white" style={{ border: `2px solid ${NOW_COLOR}` }} />Now</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm" style={{ border: `2px solid ${SEL_COLOR}`, background: "rgba(20, 152, 224, 0.10)" }} />Selected</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#b9cfe8] bg-[#dbe8f8]" />Daytime</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#7ba0b8] bg-[#8fb0c7]" />Morning / evening</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#22394a] bg-[#2e4a5a]" />Night</span>
-          <span className="flex items-center gap-1.5"><span className="flex h-4 items-center rounded-sm border border-[#22394a] bg-[#2e4a5a] px-1 text-[9px] font-bold leading-none text-white">SUN</span>Midnight</span>
         </div>
-        <p className="mt-3 text-[12px] text-gray-500">
-          {fmtTime(selectedRange.start, planner.sourceZone, hour12)}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)} in {shortZone(planner.sourceZone)} is{" "}
-          {planner.zones.map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
-        </p>
+        {planner.zones.some((z) => z !== planner.sourceZone) ? <p className={`mt-3 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>
+          In other zones: {planner.zones.filter((z) => z !== planner.sourceZone).map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
+        </p> : null}
       </div>
     </main>
   );

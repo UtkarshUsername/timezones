@@ -61,7 +61,7 @@ function Shell({ children }: { children: any }) {
     <div className="mx-auto max-w-[1100px] px-3 py-4">
       <nav className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 text-sm">
         <Link to="/" className="text-lg font-bold tracking-tight text-black">Timezones</Link>
-        <div className="flex items-center gap-2"><Link to="/" className="rounded border border-[#ddd] px-3 py-2 font-bold hover:bg-[#dbe8f8]">Time planner</Link><Link to="/polls" className="rounded bg-[#f5c04e] px-3 py-2 font-bold text-black">Group polls</Link></div>
+        <Link to="/polls" className="rounded border border-[#ddd] px-3 py-2 font-bold hover:bg-[#dbe8f8]">All polls</Link>
       </nav>
       {children}
     </div>
@@ -72,7 +72,7 @@ export function PollsHome() { return <Gate><PollsHomeContent /></Gate>; }
 function PollsHomeContent() {
   const polls = client.useQuery("myPolls");
   return <Shell>
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-bold">Group polls</h1><p className="mt-1 text-sm text-gray-500">Find a time that works for everyone.</p></div><Link to="/polls/new" className={primary}>Create a poll</Link></div>
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><h1 className="text-2xl font-bold">Group polls</h1><Link to="/polls/new" className={primary}>Create a poll</Link></div>
     <h2 className="mb-3 border-b border-[#ddd] pb-2 text-sm font-bold">Your polls</h2>
     {polls === undefined ? <p className="text-sm text-gray-500">Loading…</p> : polls.length ? <div className="grid gap-2 sm:grid-cols-2">{polls.map(p => <Link key={p.id} to={`/polls/${p.id}`} className="rounded border border-[#ddd] bg-[#f7f9fc] p-4 hover:border-[#1498e0]"><strong className="block text-base">{p.title}</strong><span className="mt-1 block text-xs text-gray-500">{(JSON.parse(p.dates) as string[]).length} dates · {p.zone}</span></Link>)}</div> : <p className="rounded border border-dashed border-[#ddd] p-6 text-sm text-gray-500">No polls yet. Create one to start.</p>}
   </Shell>;
@@ -110,7 +110,7 @@ function Calendar({ dates, onChange }: { dates: string[]; onChange: (dates: stri
     <div className="mt-2 grid grid-cols-7 gap-1 touch-pan-y" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
       {cells.map(date => { const active = dates.includes(date); const outside = new Date(`${date}T12:00:00Z`).getUTCMonth() !== month.getMonth(); const disabled = date < today || date > last; return <button key={date} data-date={date} type="button" disabled={disabled} aria-label={date} aria-pressed={active} className={`h-9 rounded-md border text-xs font-bold touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1498e0] ${active ? "border-[#0879bc] bg-[#1498e0] text-white" : outside ? "border-transparent bg-white text-gray-400" : "border-[#d4dce7] bg-[#e8f0f9] text-slate-800 hover:border-[#1498e0] hover:bg-[#dbe8f8]"} disabled:opacity-30`} onPointerDown={e => begin(e, date)} onClick={e => { if (e.detail === 0) onChange(active ? dates.filter(d => d !== date) : [...dates, date].sort()); }}>{Number(date.slice(-2))}</button>; })}
     </div>
-    <p className="mt-3 text-xs text-slate-500">Click or drag to select · <span className="font-bold text-slate-700">{dates.length} of 14 dates</span></p>
+    <p className="mt-3 text-sm text-slate-600"><span className="font-bold text-slate-700">{dates.length} of 14 dates selected</span></p>
   </div>;
 }
 
@@ -131,8 +131,7 @@ function PollCreateContent() {
   }
   return <Shell>
     <div className="mx-auto max-w-[470px] pb-12 pt-2">
-      <Link to="/polls" className="text-xs font-bold text-[#0879bc] hover:underline">← Group polls</Link>
-      <h1 className="mt-4 text-2xl font-bold tracking-tight">Create a group poll</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Create a group poll</h1>
       <p className="mt-1 text-sm text-slate-500">Pick possible dates and times, then share the link.</p>
       <form onSubmit={e => void submit(e)} className="mt-7 space-y-6">
         <label className="block text-sm font-bold">Event name<input className={`${control} mt-2 w-full py-3`} value={title} maxLength={100} placeholder="Team catch-up" onInput={e => setTitle(e.currentTarget.value)} required /></label>
@@ -174,8 +173,30 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
   }, [slots, zone]);
   const times = useMemo(() => [...new Set(days.flatMap(day => [...day.byTime.keys()]))].sort(), [days]);
   const drag = useRef<{ add: boolean; touched: Set<number> } | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<{ index: number; left: number; top: number; pinned: boolean } | null>(null);
   const max = people?.length || 0;
+  function showTooltip(target: HTMLElement, index: number, pinned: boolean) {
+    const rect = target.getBoundingClientRect();
+    setTooltip({
+      index,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - 228)),
+      top: rect.bottom + 136 > window.innerHeight ? Math.max(8, rect.top - 136) : rect.bottom + 6,
+      pinned,
+    });
+  }
+  useEffect(() => {
+    if (!tooltip?.pinned) return;
+    function dismiss(e: PointerEvent) {
+      if (!(e.target as HTMLElement).closest("[data-slot]")) setTooltip(null);
+    }
+    function dismissOnEscape(e: KeyboardEvent) { if (e.key === "Escape") setTooltip(null); }
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [tooltip?.pinned]);
   function touch(index: number) {
     if (!drag.current || !onPaint || drag.current.touched.has(index)) return;
     drag.current.touched.add(index);
@@ -198,29 +219,36 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
         const previous = times[row - 1]?.split(":").map(Number);
         const gap = previous ? hour * 60 + minute - (previous[0] * 60 + previous[1]) : 0;
         const showTime = row === 0 || minute === 0 || occurrence > 0 || gap > 15;
-        const label = new Date(Date.UTC(2000, 0, 1, hour, minute)).toLocaleTimeString("en-US", { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
+        const label = `${hour % 12 || 12}${hour < 12 ? "a" : "p"}`;
         return <div key={time} className="grid" style={{ gridTemplateColumns: columns }}>
-          <span className={"h-[15px] border-t border-r border-[#d3d3d3] pr-1 text-right text-[9px] leading-[15px] text-gray-600 " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
+          <span className={"h-6 border-t border-r border-[#d3d3d3] pr-1 text-right text-[11px] leading-6 text-slate-600 sm:h-[15px] sm:leading-[15px] " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
           {days.map(day => {
           const slot = day.byTime.get(time);
-          if (!slot) return <span key={day.date} className="h-[15px] border-t border-r border-[#e3e9f0] bg-[#f7f9fc]" />;
+          if (!slot) return <span key={day.date} className="h-6 border-t border-r border-[#e3e9f0] bg-[#f7f9fc] sm:h-[15px]" />;
           const index = slot.index;
           const count = counts?.[index] || 0;
           const active = selected?.has(index) || false;
           const bg = counts ? count ? "hsl(103 62% " + (92 - 46 * count / Math.max(max, 1)) + "%)" : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8";
           return <button key={day.date} data-slot={index} type="button" disabled={!editable && !counts}
               aria-label={format(slot.ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ", " + (counts ? count + " of " + max + " available" : active ? "available" : "unavailable")}
+              aria-describedby={counts && tooltip?.index === index ? "availability-tooltip" : undefined}
               aria-pressed={editable ? active : undefined}
-              className={"h-[15px] border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] " + (showTime ? "border-t-[#aab9c9] " : "border-t-[#e3e9f0] ") + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
+              className={"h-6 border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] sm:h-[15px] " + (showTime ? "border-t-[#aab9c9] " : "border-t-[#e3e9f0] ") + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
               style={{ backgroundColor: bg }}
               onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
-              onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) setHover(index); }}
-              onPointerEnter={() => setHover(index)} onPointerLeave={() => { if (!counts) setHover(null); }} />;
+              onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) showTooltip(e.currentTarget, index, true); }}
+              onPointerEnter={e => { if (counts && e.pointerType !== "touch") showTooltip(e.currentTarget, index, false); }}
+              onPointerLeave={e => { if (counts && e.pointerType !== "touch") setTooltip(current => current?.pinned ? current : null); }}
+              onFocus={e => { if (counts) showTooltip(e.currentTarget, index, false); }}
+              onBlur={() => { if (counts) setTooltip(null); }} />;
         })}
         </div>;
       })}
     </div>
-    {counts && hover !== null && <p role="status" className="sticky bottom-0 border-t border-[#ddd] bg-white px-2 py-1 text-xs shadow-sm">{counts[hover]} of {max} free · {people?.filter(p => p.chosen.has(hover)).map(p => p.name).join(", ") || "No one yet"}</p>}
+    {counts && tooltip && <div id="availability-tooltip" role="tooltip" className="pointer-events-none fixed z-50 max-h-32 w-[220px] overflow-y-auto rounded border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-lg" style={{ left: tooltip.left, top: tooltip.top }}>
+      <strong className="block">{counts[tooltip.index]} of {max} free</strong>
+      <span>{people?.filter(p => p.chosen.has(tooltip.index)).map(p => p.name).join(", ") || "No one yet"}</span>
+    </div>}
   </div>;
 }
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
@@ -274,13 +302,26 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
       <div className="mt-6 rounded-lg border border-[#d9e2ec] bg-[#f7f9fc] p-4 sm:p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-sm font-bold">Your name<input className={`${control} mt-2 w-full`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required /></label>{!joined && <button className="mt-3 rounded border border-[#d0a33b] bg-[#f5c04e] px-4 py-2 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join poll"}</button>}</form>
-          <label className="min-w-0 text-sm font-bold">Show times in<select className={`${control} mt-2 block w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select><span className="mt-2 block text-xs font-normal text-slate-500">Dates and times update to this time zone.</span></label>
+          <label className="min-w-0 text-sm font-bold">Show times in<select className={`${control} mt-2 block w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label>
         </div>
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
       </div>
-      <div className="mt-8 grid grid-cols-2 items-start gap-3 sm:gap-6">
-        <section className="min-w-0"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Your availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">{joined ? "Select or drag across times when you can attend. Changes save automatically." : "Join the poll above to mark your times."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
-        <section className="min-w-0 border-l border-slate-200 pl-3 sm:pl-6"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Group availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
+      <div className="mt-8">
+        <div className="grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:gap-6">
+          <section className="min-w-0">
+            <h2 className="text-sm font-bold sm:text-lg">Your availability</h2>
+            <p className="mb-3 mt-1 text-sm text-slate-600">{joined ? "Select or drag to mark your times." : "Join the poll above to mark your times."}</p>
+            <Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} />
+          </section>
+          <section className="min-w-0 border-t border-slate-200 pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-bold sm:text-lg">Group availability</h2>
+              <div className="flex w-40 items-center gap-1.5 text-xs text-slate-500 sm:w-24 md:w-40 lg:w-48"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div>
+            </div>
+            <p className="mb-3 mt-1 text-sm text-slate-600"><span className="hidden sm:inline">Hover over a time to see who's free.</span><span className="sm:hidden">Tap a time to see who's free.</span></p>
+            <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} />
+          </section>
+        </div>
       </div>
     </div>
   </Shell>;
