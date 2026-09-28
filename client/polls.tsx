@@ -266,7 +266,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   function paint(index: number, add: boolean) { editRevision.current++; setSelected(old => add ? old.includes(index) ? old : [...old, index] : old.filter(i => i !== index)); setDirty(true); setStatus("Unsaved changes"); }
   async function copy() { try { await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}`); setStatus("Link copied"); } catch { setStatus("Copy the page URL to share this poll"); } }
   return <Shell>
-    <div className="mx-auto max-w-[880px] pb-12 pt-2">
+    <div className="mx-auto max-w-[1100px] pb-12 pt-2">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
         <div className="min-w-0"><h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{poll.title}</h1><p className="mt-2 text-sm text-slate-500">{responses.length} {responses.length === 1 ? "person has" : "people have"} responded</p></div>
         <button type="button" className={`${primary} shrink-0`} onClick={() => void copy()}>Copy invite link</button>
@@ -278,9 +278,9 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         </div>
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
       </div>
-      <div className="mt-8 space-y-8">
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-2">
         <section className="min-w-0"><h2 className="text-lg font-bold">Your availability</h2><p className="mb-3 mt-1 text-sm text-slate-500">{joined ? "Select or drag across times when you can attend. Changes save automatically." : "Join the poll above to mark your times."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
-        <section className="min-w-0 border-t border-slate-200 pt-7"><h2 className="text-lg font-bold">Group availability</h2><p className="mb-3 mt-1 text-sm text-slate-500">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
+        <section className="min-w-0 border-t border-slate-200 pt-7 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"><h2 className="text-lg font-bold">Group availability</h2><p className="mb-3 mt-1 text-sm text-slate-500">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
       </div>
     </div>
   </Shell>;
