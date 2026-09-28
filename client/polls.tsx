@@ -277,9 +277,12 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         </div>
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
       </div>
-      <div className="mt-8 grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:gap-6">
-        <section className="min-w-0"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Your availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">{joined ? "Select or drag across times when you can attend." : "Join the poll above to mark your times."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
-        <section className="min-w-0 border-t border-slate-200 pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Group availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">Darker green shows when more people are free.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
+      <div className="mt-8">
+        <p className="mb-3 text-sm text-slate-600">{joined ? "To mark your availability, select or drag across times when you can attend." : "Join the poll above to mark your times."}</p>
+        <div className="grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:gap-6">
+          <section className="min-w-0"><h2 className="mb-3 text-sm font-bold sm:text-lg">Your availability</h2><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
+          <section className="min-w-0 border-t border-slate-200 pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0"><h2 className="mb-3 text-sm font-bold sm:text-lg">Group availability</h2><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
+        </div>
       </div>
     </div>
   </Shell>;
