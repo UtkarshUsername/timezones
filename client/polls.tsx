@@ -242,17 +242,28 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const editRevision = useRef(0);
+  const saveQueue = useRef(Promise.resolve());
   const dates = JSON.parse(poll.dates) as string[];
   const perDay = (poll.endHour - poll.startHour) * 4;
   const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })), [responses]);
   const counts = Array.from({ length: dates.length * perDay }, (_, i) => people.reduce((count, person) => count + (person.chosen.has(i) ? 1 : 0), 0));
   useEffect(() => {
     if (!joined || !dirty || !name.trim()) return;
-    const timer = setTimeout(() => { setStatus("Saving…"); void save(id, name, JSON.stringify(selected)).then(() => { setDirty(false); setStatus("Saved"); }).catch(err => setStatus(err instanceof Error ? err.message : "Could not save")); }, 600);
+    const revision = editRevision.current;
+    const timer = setTimeout(() => {
+      setStatus("Saving…");
+      saveQueue.current = saveQueue.current.then(() => save(id, name, JSON.stringify(selected))).then(() => {
+        if (editRevision.current === revision) {
+          setDirty(false);
+          setStatus("Saved");
+        }
+      }).catch(err => setStatus(err instanceof Error ? err.message : "Could not save"));
+    }, 600);
     return () => clearTimeout(timer);
   }, [joined, dirty, name, selected.join(","), id]);
   async function join(e: Event) { e.preventDefault(); setBusy(true); setStatus(""); try { await save(id, name, JSON.stringify(selected)); setJoined(true); setStatus("Saved. Paint the grid to add your availability."); } catch (err) { setStatus(err instanceof Error ? err.message : "Could not join"); } finally { setBusy(false); } }
-  function paint(index: number, add: boolean) { setSelected(old => add ? old.includes(index) ? old : [...old, index] : old.filter(i => i !== index)); setDirty(true); setStatus("Unsaved changes"); }
+  function paint(index: number, add: boolean) { editRevision.current++; setSelected(old => add ? old.includes(index) ? old : [...old, index] : old.filter(i => i !== index)); setDirty(true); setStatus("Unsaved changes"); }
   async function copy() { try { await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}`); setStatus("Link copied"); } catch { setStatus("Copy the page URL to share this poll"); } }
   return <Shell>
     <div className="mx-auto max-w-[880px] pb-12 pt-2">
@@ -262,7 +273,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
       </div>
       <div className="mt-6 rounded-lg border border-[#d9e2ec] bg-[#f7f9fc] p-4 sm:p-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-sm font-bold">Your name<input className={`${control} mt-2 w-full`} value={name} maxLength={50} onInput={e => { setName(e.currentTarget.value); if (joined) setDirty(true); }} required /></label>{!joined && <button className="mt-3 rounded border border-[#d0a33b] bg-[#f5c04e] px-4 py-2 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join poll"}</button>}</form>
+          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-sm font-bold">Your name<input className={`${control} mt-2 w-full`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required /></label>{!joined && <button className="mt-3 rounded border border-[#d0a33b] bg-[#f5c04e] px-4 py-2 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join poll"}</button>}</form>
           <label className="min-w-0 text-sm font-bold">Show times in<select className={`${control} mt-2 block w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select><span className="mt-2 block text-xs font-normal text-slate-500">Dates and times update to this time zone.</span></label>
         </div>
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
