@@ -374,7 +374,7 @@ export function PlannerApp() {
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
             Selected: <b>{selLabel}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
-          <span className={dark ? "text-slate-300" : "text-slate-600"}>Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
+          <span className={`basis-full ${dark ? "text-slate-300" : "text-slate-600"}`}>Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
           <span role="group" aria-label="Time format" className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
             <button aria-pressed={hour12} className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(true)} type="button">12h</button>
             <button aria-pressed={!hour12} className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(false)} type="button">24h</button>
