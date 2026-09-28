@@ -173,8 +173,30 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
   }, [slots, zone]);
   const times = useMemo(() => [...new Set(days.flatMap(day => [...day.byTime.keys()]))].sort(), [days]);
   const drag = useRef<{ add: boolean; touched: Set<number> } | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
+  const [tooltip, setTooltip] = useState<{ index: number; left: number; top: number; pinned: boolean } | null>(null);
   const max = people?.length || 0;
+  function showTooltip(target: HTMLElement, index: number, pinned: boolean) {
+    const rect = target.getBoundingClientRect();
+    setTooltip({
+      index,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - 228)),
+      top: rect.bottom + 136 > window.innerHeight ? Math.max(8, rect.top - 136) : rect.bottom + 6,
+      pinned,
+    });
+  }
+  useEffect(() => {
+    if (!tooltip?.pinned) return;
+    function dismiss(e: PointerEvent) {
+      if (!(e.target as HTMLElement).closest("[data-slot]")) setTooltip(null);
+    }
+    function dismissOnEscape(e: KeyboardEvent) { if (e.key === "Escape") setTooltip(null); }
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", dismissOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [tooltip?.pinned]);
   function touch(index: number) {
     if (!drag.current || !onPaint || drag.current.touched.has(index)) return;
     drag.current.touched.add(index);
@@ -209,17 +231,24 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
           const bg = counts ? count ? "hsl(103 62% " + (92 - 46 * count / Math.max(max, 1)) + "%)" : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8";
           return <button key={day.date} data-slot={index} type="button" disabled={!editable && !counts}
               aria-label={format(slot.ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ", " + (counts ? count + " of " + max + " available" : active ? "available" : "unavailable")}
+              aria-describedby={counts && tooltip?.index === index ? "availability-tooltip" : undefined}
               aria-pressed={editable ? active : undefined}
               className={"h-6 border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] sm:h-[15px] " + (showTime ? "border-t-[#aab9c9] " : "border-t-[#e3e9f0] ") + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
               style={{ backgroundColor: bg }}
               onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
-              onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) setHover(index); }}
-              onPointerEnter={() => setHover(index)} onPointerLeave={() => { if (!counts) setHover(null); }} />;
+              onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) showTooltip(e.currentTarget, index, true); }}
+              onPointerEnter={e => { if (counts && e.pointerType !== "touch") showTooltip(e.currentTarget, index, false); }}
+              onPointerLeave={e => { if (counts && e.pointerType !== "touch") setTooltip(current => current?.pinned ? current : null); }}
+              onFocus={e => { if (counts) showTooltip(e.currentTarget, index, false); }}
+              onBlur={() => { if (counts) setTooltip(null); }} />;
         })}
         </div>;
       })}
     </div>
-    {counts && hover !== null && <p role="status" className="sticky bottom-0 border-t border-[#ddd] bg-white px-2 py-1 text-xs shadow-sm">{counts[hover]} of {max} free · {people?.filter(p => p.chosen.has(hover)).map(p => p.name).join(", ") || "No one yet"}</p>}
+    {counts && tooltip && <div id="availability-tooltip" role="tooltip" className="pointer-events-none fixed z-50 max-h-32 w-[220px] overflow-y-auto rounded border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-lg" style={{ left: tooltip.left, top: tooltip.top }}>
+      <strong className="block">{counts[tooltip.index]} of {max} free</strong>
+      <span>{people?.filter(p => p.chosen.has(tooltip.index)).map(p => p.name).join(", ") || "No one yet"}</span>
+    </div>}
   </div>;
 }
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
