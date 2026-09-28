@@ -191,7 +191,7 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
     <div data-grid className="min-w-max select-none" style={{ minWidth: 46 + days.length * 44 }} onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
       <div className="grid border-b border-[#c5d4e6] bg-[#f7f9fc]" style={{ gridTemplateColumns: columns }}>
         <span className="border-r border-[#d3d3d3]" />
-        {days.map(day => <div key={day.date} className="flex h-10 flex-col items-center justify-center border-r border-[#d3d3d3] text-center leading-tight"><span className="text-[10px]">{format(day.first, zone, { month: "short", day: "numeric" })}</span><span className="text-sm font-bold">{format(day.first, zone, { weekday: "short" })}</span></div>)}
+        {days.map(day => <div key={day.date} className="flex h-10 flex-col items-center justify-center border-r border-[#d3d3d3] text-center leading-tight"><span className="text-[10px]">{format(day.first, zone, { month: "short", day: "numeric" })}</span><span className="text-sm">{format(day.first, zone, { weekday: "short" })}</span></div>)}
       </div>
       {times.map((time, row) => {
         const [hour, minute, occurrence] = time.split(":").map(Number);
