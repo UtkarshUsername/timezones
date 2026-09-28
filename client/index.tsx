@@ -11,7 +11,6 @@ const HOUR12_KEY = "timezones-hour12-v1";
 const CELL_W = 62;
 const CELL_GAP = 3;
 const HOURS = 48;
-const INFO_W = 248;
 const STRIP_W = HOURS * (CELL_W + CELL_GAP);
 const NOW_COLOR = "#52b306";
 const SEL_COLOR = "#1498e0";
@@ -318,7 +317,7 @@ export function PlannerApp() {
       <div
         key={key}
         className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
-        style={{ left: INFO_W + l, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: "rgba(20, 152, 224, 0.10)" }}
+        style={{ left: `calc(var(--zone-width) + ${l}px)`, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: "rgba(20, 152, 224, 0.10)" }}
       />
     );
   }
@@ -328,7 +327,7 @@ export function PlannerApp() {
       <div
         key={key}
         className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
-        style={{ left: INFO_W + idx * (CELL_W + CELL_GAP), width: CELL_W, border: `3px solid ${color}` }}
+        style={{ left: `calc(var(--zone-width) + ${idx * (CELL_W + CELL_GAP)}px)`, width: CELL_W, border: `3px solid ${color}` }}
       />
     );
   }
@@ -387,9 +386,9 @@ export function PlannerApp() {
         </div>
 
         {/* card: one shared horizontal scrollbar for all rows */}
-        <div className={`tzwrap relative overflow-hidden rounded border ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
+        <div className={`tzwrap relative overflow-hidden rounded border [--zone-width:148px] sm:[--zone-width:248px] ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
           <div ref={outerRef} className="overflow-x-auto">
-            <div className="relative" style={{ minWidth: INFO_W + STRIP_W }}>
+            <div className="relative" style={{ minWidth: `calc(var(--zone-width) + ${STRIP_W}px)` }}>
               {planner.zones.map((zone, zi) => {
                 const code = zoneCode(now, zone);
                 const off = gmtLabel(now, zone);
@@ -397,19 +396,20 @@ export function PlannerApp() {
                 const exact = fmtTime(now, zone, hour12);
                 const dateStr = formatInZone(now, zone, { weekday: "short", day: "numeric", month: "short" });
                 return (
-                  <div key={zone} className={`grid${zi > 0 ? ` border-t ${dark ? "border-zinc-700" : "border-[#eee]"}` : ""}`} style={{ gridTemplateColumns: `${INFO_W}px ${STRIP_W}px` }}>
-                    <div className={`sticky left-0 z-20 border-r border-[#eee] px-3 py-2.5 ${dark ? "border-zinc-700 bg-zinc-900" : "bg-white"}`}>
+                  <div key={zone} className={`grid${zi > 0 ? ` border-t ${dark ? "border-zinc-700" : "border-[#eee]"}` : ""}`} style={{ gridTemplateColumns: `var(--zone-width) ${STRIP_W}px` }}>
+                    <div className={`sticky left-0 z-20 border-r border-[#eee] px-2 py-2.5 sm:px-3 ${dark ? "border-zinc-700 bg-zinc-900" : "bg-white"}`}>
                       <p className={`text-[15px] font-bold ${dark ? "text-slate-100" : "text-black"}`}>
-                        <span className={dark ? "text-slate-100" : "text-black"}>{code}</span>{" "}
-                        <span className="ml-1 rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500">{off}</span>
+                        <span className={dark ? "text-slate-100" : "text-black"}>{shortZone(zone)}</span>{" "}
+                        <span className="hidden sm:inline">{code}</span>
+                        <span className="ml-1 hidden rounded border border-[#ddd] bg-[#f4f4f4] px-1 py-px align-middle text-[10px] font-normal text-gray-500 sm:inline">{off}</span>
                       </p>
-                      <p className={`text-[12.5px] leading-tight ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
-                      <p className="mt-2 flex items-start gap-3">
+                      <p className={`hidden text-[12.5px] leading-tight sm:block ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
+                      <p className="mt-2 flex flex-wrap items-start gap-2 sm:flex-nowrap sm:gap-3">
                         <span>
-                          <span className={`block text-[17px] leading-none ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
+                          <span className={`block text-[15px] leading-none sm:text-[17px] ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
                           <span className={`block pt-0.5 text-[12.5px] ${dark ? "text-slate-300" : "text-black"}`}>{dateStr}</span>
                         </span>
-                        <span className="ml-auto flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 sm:ml-auto">
                           <button aria-label={`Move ${code} up`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, -1)} type="button">↑</button>
                           <button aria-label={`Move ${code} down`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, 1)} type="button">↓</button>
                           {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
@@ -470,6 +470,7 @@ export function PlannerApp() {
             </div>
           </div>
         </div>
+        <p className="mt-2 text-xs text-slate-500 sm:hidden">Scroll the timeline to see more hours →</p>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-gray-500">
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm bg-white" style={{ border: `2px solid ${NOW_COLOR}` }} />Now</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm" style={{ border: `2px solid ${SEL_COLOR}`, background: "rgba(20, 152, 224, 0.10)" }} />Selected</span>
