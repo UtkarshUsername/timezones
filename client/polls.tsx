@@ -198,9 +198,9 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
         const previous = times[row - 1]?.split(":").map(Number);
         const gap = previous ? hour * 60 + minute - (previous[0] * 60 + previous[1]) : 0;
         const showTime = row === 0 || minute === 0 || occurrence > 0 || gap > 15;
-        const label = new Date(Date.UTC(2000, 0, 1, hour, minute)).toLocaleTimeString("en-US", { timeZone: "UTC", hour: "numeric", minute: "2-digit" });
+        const label = `${hour % 12 || 12}${hour < 12 ? "a" : "p"}`;
         return <div key={time} className="grid" style={{ gridTemplateColumns: columns }}>
-          <span className={"h-6 border-t border-r border-[#d3d3d3] pr-1 text-right text-[9px] leading-6 text-gray-600 sm:h-[15px] sm:leading-[15px] " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
+          <span className={"h-6 border-t border-r border-[#d3d3d3] pr-1 text-right text-[11px] leading-6 text-slate-600 sm:h-[15px] sm:leading-[15px] " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
           {days.map(day => {
           const slot = day.byTime.get(time);
           if (!slot) return <span key={day.date} className="h-6 border-t border-r border-[#e3e9f0] bg-[#f7f9fc] sm:h-[15px]" />;

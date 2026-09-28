@@ -335,7 +335,7 @@ export function PlannerApp() {
   return (
     <main className={`min-h-screen ${dark ? "bg-zinc-950 text-slate-100" : "bg-white text-slate-900"}`} style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
       <div className="mx-auto max-w-[980px] px-3 py-4">
-        <nav className="mb-5 flex items-center justify-between border-b border-slate-200 pb-3 text-sm"><strong className="text-lg tracking-tight">Timezones</strong><Link to="/polls" className="rounded bg-[#1498e0] px-4 py-2 font-bold text-white">Group polls →</Link></nav>
+        <nav className={`mb-5 flex items-center justify-between border-b pb-3 text-sm ${dark ? "border-zinc-700" : "border-slate-200"}`}><strong className="text-lg tracking-tight">Timezones</strong><Link to="/polls" className="rounded bg-[#1498e0] px-4 py-2 font-bold text-white">Group polls →</Link></nav>
         {/* search */}
         <div className="relative mb-4 flex max-w-[430px] items-stretch" data-search>
           <button
@@ -345,7 +345,7 @@ export function PlannerApp() {
             type="button"
           >+</button>
           <input
-            className={`w-full rounded-r border border-[#ddd] px-3 py-2.5 text-[15px] outline-none ${dark ? "bg-zinc-900 text-slate-100" : "bg-white text-slate-800"}`}
+            className={`w-full rounded-r border border-[#ddd] px-3 py-2.5 text-[15px] outline-none ${dark ? "bg-zinc-900 text-slate-100 placeholder:text-slate-400" : "bg-white text-slate-800 placeholder:text-slate-500"}`}
             onFocus={() => setOpen(true)}
             onInput={(e) => { setQuery(e.currentTarget.value); setOpen(true); }}
             placeholder="Add a city or time zone"
@@ -374,19 +374,19 @@ export function PlannerApp() {
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
             Selected: <b>{selLabel}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
-          <span className="text-slate-500">Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
+          <span className={dark ? "text-slate-300" : "text-slate-600"}>Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
           <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
-            <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(true)} type="button">12h</button>
-            <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setHour12(false)} type="button">24h</button>
+            <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(true)} type="button">12h</button>
+            <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(false)} type="button">24h</button>
           </span>
           <span className="flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
-            <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : "text-gray-500"}`} onClick={() => setTheme("light")} type="button">Light</button>
-            <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-gray-500"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
+            <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setTheme("light")} type="button">Light</button>
+            <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-slate-600"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
           </span>
         </div>
 
         {/* card: one shared horizontal scrollbar for all rows */}
-        <div className={`tzwrap relative overflow-hidden rounded border [--zone-width:148px] sm:[--zone-width:248px] ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: "0 0 5px #d5d5d5" }}>
+        <div className={`tzwrap relative overflow-hidden rounded border [--zone-width:148px] sm:[--zone-width:248px] ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#d3d3d3] bg-white"}`} style={{ boxShadow: dark ? "none" : "0 0 5px #d5d5d5" }}>
           <div ref={outerRef} className="overflow-x-auto">
             <div className="relative" style={{ minWidth: `calc(var(--zone-width) + ${STRIP_W}px)` }}>
               {planner.zones.map((zone, zi) => {
@@ -406,7 +406,7 @@ export function PlannerApp() {
                       <p className={`hidden text-[12.5px] leading-tight sm:block ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
                       <p className="mt-2 flex flex-wrap items-start gap-2 sm:flex-nowrap sm:gap-3">
                         <span>
-                          <span className={`block text-[15px] leading-none sm:text-[17px] ${dark ? "text-slate-100" : "text-black"}`}><span className="mr-1 text-[11px] font-bold uppercase text-slate-500">Now</span>{exact}</span>
+                          <span className={`block text-[15px] leading-none sm:text-[17px] ${dark ? "text-slate-100" : "text-black"}`}><span className={`mr-1 text-[11px] font-bold uppercase ${dark ? "text-slate-300" : "text-slate-600"}`}>Now</span>{exact}</span>
                           <span className={`block pt-0.5 text-[12.5px] ${dark ? "text-slate-300" : "text-black"}`}>{dateStr}</span>
                         </span>
                         <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 sm:ml-auto">
@@ -470,15 +470,15 @@ export function PlannerApp() {
             </div>
           </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500 sm:hidden">Scroll the timeline to see more hours →</p>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-gray-500">
+        <p className={`mt-2 text-sm sm:hidden ${dark ? "text-slate-300" : "text-slate-600"}`}>Scroll the timeline to see more hours →</p>
+        <div className={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm bg-white" style={{ border: `2px solid ${NOW_COLOR}` }} />Now</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm" style={{ border: `2px solid ${SEL_COLOR}`, background: "rgba(20, 152, 224, 0.10)" }} />Selected</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#b9cfe8] bg-[#dbe8f8]" />Daytime</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#7ba0b8] bg-[#8fb0c7]" />Morning / evening</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#22394a] bg-[#2e4a5a]" />Night</span>
         </div>
-        {planner.zones.some((z) => z !== planner.sourceZone) ? <p className="mt-3 text-sm text-slate-600">
+        {planner.zones.some((z) => z !== planner.sourceZone) ? <p className={`mt-3 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>
           In other zones: {planner.zones.filter((z) => z !== planner.sourceZone).map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
         </p> : null}
       </div>
