@@ -375,13 +375,13 @@ export function PlannerApp() {
             Selected: <b>{selLabel}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
           <span className={dark ? "text-slate-300" : "text-slate-600"}>Select an hour or drag to choose a range.<span className="sr-only"> With a keyboard, press Enter to select an hour or Shift+Enter to extend the range.</span></span>
-          <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
-            <button className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(true)} type="button">12h</button>
-            <button className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(false)} type="button">24h</button>
+          <span role="group" aria-label="Time format" className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
+            <button aria-pressed={hour12} className={`px-2.5 py-1.5 ${hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(true)} type="button">12h</button>
+            <button aria-pressed={!hour12} className={`px-2.5 py-1.5 ${!hour12 ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setHour12(false)} type="button">24h</button>
           </span>
-          <span className="flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
-            <button className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setTheme("light")} type="button">Light</button>
-            <button className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-slate-600"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
+          <span role="group" aria-label="Color theme" className="flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
+            <button aria-pressed={theme === "light"} className={`px-2.5 py-1.5 ${theme === "light" ? "bg-[#f5c04e] text-black" : dark ? "text-slate-300" : "text-slate-600"}`} onClick={() => setTheme("light")} type="button">Light</button>
+            <button aria-pressed={theme === "dark"} className={`px-2.5 py-1.5 ${theme === "dark" ? "bg-[#2e4a5a] text-white" : "text-slate-600"}`} onClick={() => setTheme("dark")} type="button">Dark</button>
           </span>
         </div>
 
@@ -410,9 +410,9 @@ export function PlannerApp() {
                           <span className={`block pt-0.5 text-[12.5px] ${dark ? "text-slate-300" : "text-black"}`}>{dateStr}</span>
                         </span>
                         <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 sm:ml-auto">
-                          <button aria-label={`Move ${code} up`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, -1)} type="button">↑</button>
-                          <button aria-label={`Move ${code} down`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-black" onClick={() => moveZone(zone, 1)} type="button">↓</button>
-                          {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-1.5 py-0.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
+                          <button aria-label={`Move ${shortZone(zone)} up`} disabled={zi === 0} className="rounded border border-[#ddd] px-2 py-1.5 hover:text-black disabled:opacity-40" onClick={() => moveZone(zone, -1)} type="button">↑</button>
+                          <button aria-label={`Move ${shortZone(zone)} down`} disabled={zi === planner.zones.length - 1} className="rounded border border-[#ddd] px-2 py-1.5 hover:text-black disabled:opacity-40" onClick={() => moveZone(zone, 1)} type="button">↓</button>
+                          {planner.zones.length > 1 ? <button aria-label={`Remove ${zone}`} className="rounded border border-[#ddd] px-2 py-1.5 hover:text-red-600" onClick={() => removeZone(zone)} type="button">✕</button> : null}
                         </span>
                       </p>
                     </div>
