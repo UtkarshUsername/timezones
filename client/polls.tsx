@@ -186,12 +186,12 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
     const index = (document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-slot]") as HTMLElement | null)?.dataset.slot;
     if (index !== undefined) touch(Number(index));
   }
-  const columns = "58px repeat(" + days.length + ", minmax(86px, 1fr))";
+  const columns = "46px repeat(" + days.length + ", minmax(44px, 1fr))";
   return <div className="min-w-0 overflow-x-auto rounded border border-[#d3d3d3] bg-white shadow-sm">
-    <div data-grid className="min-w-max select-none" style={{ minWidth: 58 + days.length * 86 }} onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
+    <div data-grid className="min-w-max select-none" style={{ minWidth: 46 + days.length * 44 }} onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
       <div className="grid border-b border-[#c5d4e6] bg-[#f7f9fc]" style={{ gridTemplateColumns: columns }}>
         <span className="border-r border-[#d3d3d3]" />
-        {days.map(day => <div key={day.date} className="flex h-10 items-center justify-center border-r border-[#d3d3d3] px-1 text-center text-[11px] font-bold">{format(day.first, zone, { weekday: "short", month: "short", day: "numeric" })}</div>)}
+        {days.map(day => <div key={day.date} className="flex h-10 flex-col items-center justify-center border-r border-[#d3d3d3] text-center leading-tight"><span className="text-[10px]">{format(day.first, zone, { month: "short", day: "numeric" })}</span><span className="text-sm font-bold">{format(day.first, zone, { weekday: "short" })}</span></div>)}
       </div>
       {times.map((time, row) => {
         const [hour, minute, occurrence] = time.split(":").map(Number);
@@ -278,9 +278,9 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         </div>
         <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
       </div>
-      <div className="mt-8 grid items-start gap-6 lg:grid-cols-2">
-        <section className="min-w-0"><h2 className="text-lg font-bold">Your availability</h2><p className="mb-3 mt-1 text-sm text-slate-500">{joined ? "Select or drag across times when you can attend. Changes save automatically." : "Join the poll above to mark your times."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
-        <section className="min-w-0 border-t border-slate-200 pt-7 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"><h2 className="text-lg font-bold">Group availability</h2><p className="mb-3 mt-1 text-sm text-slate-500">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
+      <div className="mt-8 grid grid-cols-2 items-start gap-3 sm:gap-6">
+        <section className="min-w-0"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Your availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">{joined ? "Select or drag across times when you can attend. Changes save automatically." : "Join the poll above to mark your times."}</p><Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} /></section>
+        <section className="min-w-0 border-l border-slate-200 pl-3 sm:pl-6"><h2 className="mb-3 text-sm font-bold sm:mb-0 sm:text-lg">Group availability</h2><p className="mb-3 mt-1 hidden text-sm text-slate-500 sm:block">Darker green means more people are free. Select a time to see who.</p><Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} /><div className="mt-3 flex max-w-sm items-center gap-2 text-xs text-slate-500"><span>0/{responses.length}</span><span className="h-3 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div></section>
       </div>
     </div>
   </Shell>;
