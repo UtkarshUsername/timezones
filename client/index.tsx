@@ -303,7 +303,7 @@ export function PlannerApp() {
   }, [windowStart, planner.zones.length, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selLabel = fmtTime(selectedRange.start, planner.sourceZone, hour12);
-  const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short" });
+  const selDate = formatInZone(selectedRange.start, planner.sourceZone, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
   function spanRange(s: number, e: number, color: string, key: string) {
     const pitch = CELL_W + CELL_GAP;
@@ -372,7 +372,7 @@ export function PlannerApp() {
           <input aria-label="Date" className={`rounded border border-[#ddd] px-2 py-1.5 text-[13px] ${dark ? "bg-zinc-900 [color-scheme:dark]" : "bg-white"}`} type="date" value={planner.date} onInput={(e) => changeDate(e.currentTarget.value)} />
           <button className={`rounded border px-2 py-1.5 font-bold ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc] hover:bg-[#dbe8f8]"}`} onClick={goToday} type="button">Today</button>
           <span className={`rounded border px-2 py-1.5 ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-[#f7f9fc]"}`}>
-            Selected: <b>{selLabel}</b> · {shortZone(planner.sourceZone)} · {selDate}
+            Selected: <b>{selLabel}–{fmtTime(selectedRange.end, planner.sourceZone, hour12)}</b> · {shortZone(planner.sourceZone)} · {selDate}
           </span>
           <span className="text-gray-400">Click an hour box, or drag across boxes to select a period. With a keyboard, use Enter to select an hour or Shift+Enter to extend the range. Green is now, blue is selected.</span>
           <span className="ml-auto flex overflow-hidden rounded border border-[#ddd] text-[12px] font-bold">
@@ -406,7 +406,7 @@ export function PlannerApp() {
                       <p className={`hidden text-[12.5px] leading-tight sm:block ${dark ? "text-slate-300" : "text-black"}`}>{name}</p>
                       <p className="mt-2 flex flex-wrap items-start gap-2 sm:flex-nowrap sm:gap-3">
                         <span>
-                          <span className={`block text-[15px] leading-none sm:text-[17px] ${dark ? "text-slate-100" : "text-black"}`}>{exact}</span>
+                          <span className={`block text-[15px] leading-none sm:text-[17px] ${dark ? "text-slate-100" : "text-black"}`}><span className="mr-1 text-[11px] font-bold uppercase text-slate-500">Now</span>{exact}</span>
                           <span className={`block pt-0.5 text-[12.5px] ${dark ? "text-slate-300" : "text-black"}`}>{dateStr}</span>
                         </span>
                         <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 sm:ml-auto">
