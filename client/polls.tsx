@@ -182,7 +182,7 @@ function PollCreateContent() {
   </Shell>;
 }
 
-function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }: { poll: Poll; dates: string[]; zone: string; selected?: Set<number>; counts?: number[]; people?: { name: string; chosen: Set<number> }[]; editable?: boolean; onPaint?: (index: number, add: boolean) => void }) {
+function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint, scrollRef, onScroll }: { poll: Poll; dates: string[]; zone: string; selected?: Set<number>; counts?: number[]; people?: { name: string; chosen: Set<number> }[]; editable?: boolean; onPaint?: (index: number, add: boolean) => void; scrollRef?: { current: HTMLDivElement | null }; onScroll?: (left: number) => void }) {
   const perDay = (poll.endHour - poll.startHour) * 4;
   const slots = useMemo(() => dates.flatMap((date, col) =>
     Array.from({ length: perDay }, (_, row) => ({
@@ -246,7 +246,7 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
     if (index !== undefined) touch(Number(index));
   }
   const columns = "46px repeat(" + days.length + ", minmax(44px, 1fr))";
-  return <div className="min-w-0 overflow-x-auto rounded border border-[#d3d3d3] bg-white shadow-sm">
+  return <div ref={scrollRef} onScroll={e => onScroll?.(e.currentTarget.scrollLeft)} className="min-w-0 overflow-x-auto rounded border border-[#d3d3d3] bg-white shadow-sm">
     <div data-grid className="min-w-max select-none" style={{ minWidth: 46 + days.length * 44 }} onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
       <div className="grid border-b border-[#c5d4e6] bg-[#f7f9fc]" style={{ gridTemplateColumns: columns }}>
         <span className="border-r border-[#d3d3d3]" />
@@ -313,6 +313,8 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const [busy, setBusy] = useState(false);
   const editRevision = useRef(0);
   const saveQueue = useRef(Promise.resolve());
+  const yourGridScroll = useRef<HTMLDivElement>(null);
+  const groupGridScroll = useRef<HTMLDivElement>(null);
   const dates = JSON.parse(poll.dates) as string[];
   const perDay = (poll.endHour - poll.startHour) * 4;
   const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })), [responses]);
@@ -352,7 +354,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
           <section className="min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0">
             <h2 className="text-sm font-bold sm:text-base lg:text-lg">Your availability</h2>
             <p className="mb-3 mt-1 text-sm text-slate-600">{joined ? "Select or drag to mark your times." : "Join the poll above to mark your times."}</p>
-            <Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} />
+            <Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} scrollRef={yourGridScroll} onScroll={left => { if (groupGridScroll.current) groupGridScroll.current.scrollLeft = left; }} />
           </section>
           <section className="min-w-0 border-t border-slate-200 pt-6 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0 sm:border-t-0 sm:pt-0">
             <div className="flex items-center justify-between gap-1.5">
@@ -360,7 +362,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
               <div className="flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500"><span className="shrink-0">0/{responses.length}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{responses.length}/{responses.length}</span></div>
             </div>
             <p className="mb-3 mt-1 text-sm text-slate-600"><span className="hidden sm:inline">Hover over a time to see who's free.</span><span className="sm:hidden">Tap a time to see who's free.</span></p>
-            <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} />
+            <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} scrollRef={groupGridScroll} onScroll={left => { if (yourGridScroll.current) yourGridScroll.current.scrollLeft = left; }} />
           </section>
         </div>
       </div>
