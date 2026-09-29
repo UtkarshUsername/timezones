@@ -182,7 +182,7 @@ function PollCreateContent() {
   </Shell>;
 }
 
-function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint, scrollRef, onScroll }: { poll: Poll; dates: string[]; zone: string; selected?: Set<number>; counts?: number[]; people?: { name: string; chosen: Set<number> }[]; editable?: boolean; onPaint?: (index: number, add: boolean) => void; scrollRef?: { current: HTMLDivElement | null }; onScroll?: (left: number) => void }) {
+function Grid({ poll, dates, zone, selected, counts, peakAvailability = 0, people, editable, onPaint, scrollRef, onScroll }: { poll: Poll; dates: string[]; zone: string; selected?: Set<number>; counts?: number[]; peakAvailability?: number; people?: { name: string; chosen: Set<number> }[]; editable?: boolean; onPaint?: (index: number, add: boolean) => void; scrollRef?: { current: HTMLDivElement | null }; onScroll?: (left: number) => void }) {
   const perDay = (poll.endHour - poll.startHour) * 4;
   const slots = useMemo(() => dates.flatMap((date, col) =>
     Array.from({ length: perDay }, (_, row) => ({
@@ -266,7 +266,7 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint, 
           const index = slot.index;
           const count = counts?.[index] || 0;
           const active = selected?.has(index) || false;
-          const bg = counts ? count ? "hsl(103 62% " + (92 - 46 * count / Math.max(max, 1)) + "%)" : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8";
+          const bg = counts ? count ? "hsl(103 62% " + (92 - 46 * count / Math.max(peakAvailability, 1)) + "%)" : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8";
           const topBorder = counts
             ? showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]"
             : showTime ? "border-t-[#879eb6]" : "border-t-[#b2c5d9]";
@@ -292,8 +292,8 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint, 
     </div>}
   </div>;
 }
-function AvailabilityLegend({ total, className = "" }: { total: number; className?: string }) {
-  return <div className={"flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500 " + className}><span className="shrink-0">0/{total}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{total}/{total}</span></div>;
+function AvailabilityLegend({ total, peak }: { total: number; peak: number }) {
+  return <div className="flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500"><span className="shrink-0">0/{total}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{peak}/{total}</span></div>;
 }
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
 function PollPageContent() {
@@ -324,6 +324,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const perDay = (poll.endHour - poll.startHour) * 4;
   const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })).filter(person => person.chosen.size > 0), [responses]);
   const counts = Array.from({ length: dates.length * perDay }, (_, i) => people.reduce((count, person) => count + (person.chosen.has(i) ? 1 : 0), 0));
+  const peakAvailability = counts.reduce((highest, count) => Math.max(highest, count), 0);
   useEffect(() => {
     const activeGrid = mobileView === "your" ? yourGridScroll.current : groupGridScroll.current;
     if (activeGrid) activeGrid.scrollLeft = scrollPosition.current;
@@ -379,11 +380,11 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
           <section id="group-availability" className={(mobileView === "group" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
             <div className="hidden items-center justify-between gap-1.5 sm:flex">
               <h2 className="whitespace-nowrap text-sm font-bold sm:text-base lg:text-lg">Group availability</h2>
-              <AvailabilityLegend total={people.length} />
+              <AvailabilityLegend total={people.length} peak={peakAvailability} />
             </div>
             <p className="mb-3 mt-1 hidden text-sm text-slate-600 sm:block">Hover over a time to see who's free.</p>
-            <div className="mb-3 mt-1 flex items-center justify-between gap-2 sm:hidden"><span className="shrink-0 text-xs text-slate-600">Tap for names</span><AvailabilityLegend total={people.length} /></div>
-            <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} scrollRef={groupGridScroll} onScroll={left => syncScroll(left, yourGridScroll)} />
+            <div className="mb-3 mt-1 flex items-center justify-between gap-2 sm:hidden"><span className="shrink-0 text-xs text-slate-600">Tap for names</span><AvailabilityLegend total={people.length} peak={peakAvailability} /></div>
+            <Grid poll={poll} dates={dates} zone={zone} counts={counts} peakAvailability={peakAvailability} people={people} scrollRef={groupGridScroll} onScroll={left => syncScroll(left, yourGridScroll)} />
           </section>
         </div>
       </div>
