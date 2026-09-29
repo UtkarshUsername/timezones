@@ -300,17 +300,17 @@ export function PlannerApp() {
             value={query}
           />
           {open ? (
-            <div className={`absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded border shadow-lg ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-white"}`}>
+            <div className={`absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded border shadow-lg ${dark ? "border-zinc-700 bg-zinc-900" : "border-[#ddd] bg-white"}`}>
               {matches.map((z) => {
                 const added = planner.zones.includes(z);
                 return (
-                  <button key={z} className={`flex w-full items-center justify-between px-3 py-2 text-left text-[13px] ${added ? "cursor-default opacity-50" : "hover:bg-[#dbe8f8] hover:text-black"}`} disabled={added} onClick={() => addZone(z)} type="button">
-                    <span><b>{zoneCode(now, z)}</b> · {shortZone(z)} <span className="text-gray-500">{z}</span></span>
-                    <span className="text-gray-400">{added ? "added" : gmtLabel(now, z)}</span>
+                  <button key={z} className={`block w-full border-b px-3 py-2 text-left text-xs ${dark ? "border-zinc-800" : "border-slate-100"} ${added ? "cursor-default opacity-50" : "hover:bg-[#dbe8f8] hover:text-black focus:bg-[#dbe8f8] focus:outline-none"}`} disabled={added} onClick={() => addZone(z)} type="button">
+                    <span className="flex justify-between gap-2"><span><b>{zoneCode(now, z)}</b> · {shortZone(z)}</span><span className="shrink-0 text-slate-500">{added ? "added" : gmtLabel(now, z)}</span></span>
+                    <span className="block truncate text-slate-500">{z}</span>
                   </button>
                 );
               })}
-              {matches.length === 0 ? <p className="px-3 py-2 text-[13px] text-gray-500">No matches</p> : null}
+              {matches.length === 0 ? <p className="px-3 py-2 text-xs text-slate-500">No matches</p> : null}
             </div>
           ) : null}
         </div>
