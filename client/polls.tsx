@@ -267,11 +267,14 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
           const count = counts?.[index] || 0;
           const active = selected?.has(index) || false;
           const bg = counts ? count ? "hsl(103 62% " + (92 - 46 * count / Math.max(max, 1)) + "%)" : "#f3f5f7" : active ? "#1498e0" : "#dbe8f8";
+          const topBorder = counts
+            ? showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]"
+            : showTime ? "border-t-[#879eb6]" : "border-t-[#b2c5d9]";
           return <button key={day.date} data-slot={index} type="button" disabled={!editable && !counts}
               aria-label={format(slot.ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ", " + (counts ? count + " of " + max + " available" : active ? "available" : "unavailable")}
               aria-describedby={counts && tooltip?.index === index ? "availability-tooltip" : undefined}
               aria-pressed={editable ? active : undefined}
-              className={"h-6 border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] sm:h-[15px] " + (showTime ? "border-t-[#aab9c9] " : "border-t-[#e3e9f0] ") + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
+              className={"h-6 border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] sm:h-[15px] " + topBorder + " " + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
               style={{ backgroundColor: bg }}
               onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
               onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) showTooltip(e.currentTarget, index, true); }}
