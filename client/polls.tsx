@@ -219,7 +219,7 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
         const previous = times[row - 1]?.split(":").map(Number);
         const gap = previous ? hour * 60 + minute - (previous[0] * 60 + previous[1]) : 0;
         const showTime = row === 0 || minute === 0 || occurrence > 0 || gap > 15;
-        const label = `${hour % 12 || 12}${hour < 12 ? "a" : "p"}`;
+        const label = `${hour % 12 || 12} ${hour < 12 ? "am" : "pm"}`;
         return <div key={time} className="grid" style={{ gridTemplateColumns: columns }}>
           <span className={"h-6 border-t border-r border-[#d3d3d3] pr-1 text-right text-[11px] leading-6 text-slate-600 sm:h-[15px] sm:leading-[15px] " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
           {days.map(day => {
