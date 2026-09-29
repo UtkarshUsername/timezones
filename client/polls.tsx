@@ -354,7 +354,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
           <section className="min-w-0 border-t border-slate-200 pt-6 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
             <div className="flex items-center justify-between gap-1.5">
               <h2 className="whitespace-nowrap text-sm font-bold sm:text-base lg:text-lg">Group availability</h2>
-              <div className="flex w-20 shrink-0 items-center gap-1 text-xs text-slate-500 md:w-28 lg:w-40"><span>0/{responses.length}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span>{responses.length}/{responses.length}</span></div>
+              <div className="flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500"><span className="shrink-0">0/{responses.length}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{responses.length}/{responses.length}</span></div>
             </div>
             <p className="mb-3 mt-1 text-sm text-slate-600"><span className="hidden sm:inline">Hover over a time to see who's free.</span><span className="sm:hidden">Tap a time to see who's free.</span></p>
             <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} />
