@@ -299,14 +299,14 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         <div className="min-w-0"><h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{poll.title}</h1><p className="mt-2 text-sm text-slate-500">{responses.length} {responses.length === 1 ? "person has" : "people have"} responded</p></div>
         <button type="button" className={`${primary} shrink-0`} onClick={() => void copy()}>Copy invite link</button>
       </div>
-      <div className="mt-6 rounded-lg border border-[#d9e2ec] bg-[#f7f9fc] p-4 sm:p-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-sm font-bold">Your name<input className={`${control} mt-2 w-full`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required /></label>{!joined && <button className="mt-3 rounded border border-[#d0a33b] bg-[#f5c04e] px-4 py-2 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join poll"}</button>}</form>
-          <label className="min-w-0 text-sm font-bold">Show times in<select className={`${control} mt-2 block w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label>
+      <div className="mt-5 border-b border-slate-200 pb-5">
+        <div className="grid gap-3 min-[430px]:grid-cols-2 min-[430px]:items-end">
+          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-xs font-bold text-slate-600">Your name<div className="mt-1.5 flex gap-2"><input className={`${control} min-w-0 flex-1`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required />{!joined && <button className="shrink-0 rounded border border-[#d0a33b] bg-[#f5c04e] px-3 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join"}</button>}</div></label></form>
+          <label className="min-w-0 text-xs font-bold text-slate-600">Show times in<select className={`${control} mt-1.5 block w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label>
         </div>
-        <p role="status" className="mt-3 text-xs text-slate-600">{status || (joined ? "Changes save automatically" : "Enter your name to mark your availability")}</p>
+        {(status || joined) && <p role="status" className="mt-2 text-xs text-slate-600">{status || "Changes save automatically"}</p>}
       </div>
-      <div className="mt-8">
+      <div className="mt-6">
         <div className="grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:gap-6">
           <section className="min-w-0">
             <h2 className="text-sm font-bold sm:text-lg">Your availability</h2>
