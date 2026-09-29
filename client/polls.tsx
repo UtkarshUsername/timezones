@@ -292,6 +292,9 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint, 
     </div>}
   </div>;
 }
+function AvailabilityLegend({ total, className = "" }: { total: number; className?: string }) {
+  return <div className={"flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500 " + className}><span className="shrink-0">0/{total}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{total}/{total}</span></div>;
+}
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
 function PollPageContent() {
   const { id } = useParams<{ id: string }>();
@@ -374,11 +377,12 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
             <Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} scrollRef={yourGridScroll} onScroll={left => syncScroll(left, groupGridScroll)} />
           </section>
           <section id="group-availability" className={(mobileView === "group" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
-            <div className="flex items-center justify-between gap-1.5">
-              <h2 className="hidden whitespace-nowrap text-sm font-bold sm:block sm:text-base lg:text-lg">Group availability</h2>
-              <div className="flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500"><span className="shrink-0">0/{responses.length}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{responses.length}/{responses.length}</span></div>
+            <div className="hidden items-center justify-between gap-1.5 sm:flex">
+              <h2 className="whitespace-nowrap text-sm font-bold sm:text-base lg:text-lg">Group availability</h2>
+              <AvailabilityLegend total={responses.length} />
             </div>
-            <p className="mb-3 mt-1 text-sm text-slate-600"><span className="hidden sm:inline">Hover over a time to see who's free.</span><span className="sm:hidden">Tap a time to see who's free.</span></p>
+            <p className="mb-3 mt-1 hidden text-sm text-slate-600 sm:block">Hover over a time to see who's free.</p>
+            <div className="mb-3 mt-1 flex items-center justify-between gap-2 sm:hidden"><span className="shrink-0 text-xs text-slate-600">Tap for names</span><AvailabilityLegend total={responses.length} /></div>
             <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} scrollRef={groupGridScroll} onScroll={left => syncScroll(left, yourGridScroll)} />
           </section>
         </div>
