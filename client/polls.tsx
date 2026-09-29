@@ -360,19 +360,22 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
         {(status || joined) && <p role="status" className="mt-2 text-xs text-slate-600">{status || "Changes save automatically"}</p>}
       </div>
       <div className="mt-6">
-        <div className="mb-4 grid grid-cols-2 rounded border border-[#d3d3d3] p-1 sm:hidden" role="group" aria-label="Availability view">
-          <button type="button" aria-pressed={mobileView === "your"} aria-controls="your-availability" className={"rounded px-3 py-2 text-sm font-bold " + (mobileView === "your" ? "bg-[#1498e0] text-white" : "text-slate-600")} onClick={() => setMobileView("your")}>Your availability</button>
-          <button type="button" aria-pressed={mobileView === "group"} aria-controls="group-availability" className={"rounded px-3 py-2 text-sm font-bold " + (mobileView === "group" ? "bg-[#1498e0] text-white" : "text-slate-600")} onClick={() => setMobileView("group")}>Group availability</button>
+        <div className="mb-2 flex items-center justify-between gap-2 sm:hidden">
+          <h2 className="text-sm font-bold">{mobileView === "your" ? "Your availability" : "Group availability"}</h2>
+          <div className="flex shrink-0 rounded-full bg-slate-100 p-0.5" role="group" aria-label="Availability view">
+            <button type="button" aria-pressed={mobileView === "your"} aria-controls="your-availability" className={"rounded-full px-2.5 py-1 text-xs font-bold " + (mobileView === "your" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")} onClick={() => setMobileView("your")}>Your</button>
+            <button type="button" aria-pressed={mobileView === "group"} aria-controls="group-availability" className={"rounded-full px-2.5 py-1 text-xs font-bold " + (mobileView === "group" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")} onClick={() => setMobileView("group")}>Group</button>
+          </div>
         </div>
         <div className="grid grid-cols-1 items-start gap-8 sm:grid-cols-2 sm:grid-rows-[auto_auto_auto] sm:gap-x-6 sm:gap-y-0">
           <section id="your-availability" className={(mobileView === "your" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
-            <h2 className="text-sm font-bold sm:text-base lg:text-lg">Your availability</h2>
+            <h2 className="hidden text-sm font-bold sm:block sm:text-base lg:text-lg">Your availability</h2>
             <p className="mb-3 mt-1 text-sm text-slate-600">{joined ? "Select or drag to mark your times." : "Join the poll above to mark your times."}</p>
             <Grid poll={poll} dates={dates} zone={zone} selected={new Set(selected)} editable={joined} onPaint={paint} scrollRef={yourGridScroll} onScroll={left => syncScroll(left, groupGridScroll)} />
           </section>
           <section id="group-availability" className={(mobileView === "group" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
             <div className="flex items-center justify-between gap-1.5">
-              <h2 className="whitespace-nowrap text-sm font-bold sm:text-base lg:text-lg">Group availability</h2>
+              <h2 className="hidden whitespace-nowrap text-sm font-bold sm:block sm:text-base lg:text-lg">Group availability</h2>
               <div className="flex min-w-0 max-w-56 flex-1 items-center gap-1 text-xs text-slate-500"><span className="shrink-0">0/{responses.length}</span><span className="h-3 min-w-0 flex-1 rounded" style={{ background: "linear-gradient(to right, #f3f5f7, #c6e8af, #398f17)" }} /><span className="shrink-0">{responses.length}/{responses.length}</span></div>
             </div>
             <p className="mb-3 mt-1 text-sm text-slate-600"><span className="hidden sm:inline">Hover over a time to see who's free.</span><span className="sm:hidden">Tap a time to see who's free.</span></p>
