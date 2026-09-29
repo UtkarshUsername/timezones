@@ -322,7 +322,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const scrollPosition = useRef(0);
   const dates = JSON.parse(poll.dates) as string[];
   const perDay = (poll.endHour - poll.startHour) * 4;
-  const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })), [responses]);
+  const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })).filter(person => person.chosen.size > 0), [responses]);
   const counts = Array.from({ length: dates.length * perDay }, (_, i) => people.reduce((count, person) => count + (person.chosen.has(i) ? 1 : 0), 0));
   useEffect(() => {
     const activeGrid = mobileView === "your" ? yourGridScroll.current : groupGridScroll.current;
@@ -352,7 +352,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   return <Shell>
     <div className="mx-auto max-w-[1100px] pb-12 pt-2">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
-        <div className="min-w-0"><h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{poll.title}</h1><p className="mt-2 text-sm text-slate-500">{responses.length} {responses.length === 1 ? "person has" : "people have"} responded</p></div>
+        <div className="min-w-0"><h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{poll.title}</h1><p className="mt-2 text-sm text-slate-500">{people.length} {people.length === 1 ? "person has" : "people have"} responded</p></div>
         <button type="button" className={`${primary} shrink-0`} onClick={() => void copy()}>Copy invite link</button>
       </div>
       <div className="mt-5 border-b border-slate-200 pb-5">
@@ -379,10 +379,10 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
           <section id="group-availability" className={(mobileView === "group" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
             <div className="hidden items-center justify-between gap-1.5 sm:flex">
               <h2 className="whitespace-nowrap text-sm font-bold sm:text-base lg:text-lg">Group availability</h2>
-              <AvailabilityLegend total={responses.length} />
+              <AvailabilityLegend total={people.length} />
             </div>
             <p className="mb-3 mt-1 hidden text-sm text-slate-600 sm:block">Hover over a time to see who's free.</p>
-            <div className="mb-3 mt-1 flex items-center justify-between gap-2 sm:hidden"><span className="shrink-0 text-xs text-slate-600">Tap for names</span><AvailabilityLegend total={responses.length} /></div>
+            <div className="mb-3 mt-1 flex items-center justify-between gap-2 sm:hidden"><span className="shrink-0 text-xs text-slate-600">Tap for names</span><AvailabilityLegend total={people.length} /></div>
             <Grid poll={poll} dates={dates} zone={zone} counts={counts} people={people} scrollRef={groupGridScroll} onScroll={left => syncScroll(left, yourGridScroll)} />
           </section>
         </div>
