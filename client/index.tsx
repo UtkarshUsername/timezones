@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Link, Route, Router, Routes } from "lakebed/client";
 import { PollCreate, PollPage, PollsHome } from "./polls";
+import { canonZone, fullName, gmtLabel, matchingZones, offsetMinutes, shortZone, zoneCode, zoneOptions } from "./zones";
 
 type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string; startTs?: number; endTs?: number };
 type Theme = "light" | "dark";
@@ -15,23 +16,7 @@ const STRIP_W = HOURS * (CELL_W + CELL_GAP);
 const NOW_COLOR = "#52b306";
 const SEL_COLOR = "#1498e0";
 
-const zoneOptions = [
-  "Pacific/Midway", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles",
-  "America/Denver", "America/Chicago", "America/New_York", "America/Halifax",
-  "America/Sao_Paulo", "Atlantic/Azores", "Etc/GMT-2", "Europe/London", "Europe/Paris",
-  "Europe/Berlin", "Europe/Helsinki", "Africa/Cairo", "Africa/Johannesburg",
-  "Asia/Dubai", "Asia/Karachi", "Asia/Kolkata", "Asia/Dhaka", "Asia/Bangkok",
-  "Asia/Singapore", "Asia/Hong_Kong", "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul",
-  "Australia/Perth", "Australia/Sydney", "Pacific/Auckland",
-].sort((a, b) => shortZone(a).localeCompare(shortZone(b)));
-
-function shortZone(zone: string) {
-  const etc = zone.match(/^Etc\/GMT([+-])(\d+)$/);
-  if (etc) return `GMT${etc[1] === "+" ? "-" : "+"}${Number(etc[2])}`;
-  return zone.split("/").at(-1)?.replaceAll("_", " ") || zone;
-}
 function localDate() { return new Date().toLocaleDateString("en-CA"); }
-function canonZone(zone: string) { return zone === "Asia/Calcutta" ? "Asia/Kolkata" : zone; }
 function initialState(): SavedState {
   const detected = canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   return {
@@ -55,21 +40,6 @@ function loadState(): SavedState {
 function formatInZone(ts: number, zone: string, o: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...o }).format(ts);
 }
-function zoneCode(ts: number, zone: string) {
-  if (zone === "Asia/Kolkata" || zone === "Asia/Calcutta") return "IST";
-  try {
-    return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value || "GMT";
-  } catch { return "GMT"; }
-}
-function offsetMinutes(ts: number, zone: string) {
-  try {
-    const part = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value || "GMT";
-    const m = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!m) return 0;
-    const mins = Number(m[2]) * 60 + Number(m[3] || 0);
-    return m[1] === "+" ? mins : -mins;
-  } catch { return 0; }
-}
 function zonedTimestamp(date: string, time: string, zone: string) {
   const [y, mo, d] = date.split("-").map(Number);
   const [h, mi] = time.split(":").map(Number);
@@ -85,22 +55,6 @@ function zonedTimestamp(date: string, time: string, zone: string) {
   return candidates.find((ts) => local(ts) === requested)
     ?? candidates.find((ts) => local(ts) > requested)
     ?? candidates[candidates.length - 1];
-}
-function gmtLabel(ts: number, zone: string) {
-  const mins = offsetMinutes(ts, zone);
-  const sign = mins < 0 ? "-" : "+";
-  const a = Math.abs(mins);
-  const h = Math.floor(a / 60);
-  const r = a % 60;
-  if (h === 0 && r === 0) return "GMT";
-  return `GMT${sign}${h}${r ? ":" + String(r).padStart(2, "0") : ""}`;
-}
-function fullName(zone: string, ts: number) {
-  try {
-    const long = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "long" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value;
-    if (long && long !== zone) return long;
-  } catch { /* ignore */ }
-  return zone.replaceAll("_", " ");
 }
 function cellTone(hour: number): "day" | "mid" | "night" {
   if (hour >= 8 && hour <= 21) return "day";
@@ -282,14 +236,8 @@ export function PlannerApp() {
   }
 
   const dark = theme === "dark";
-  const q = query.trim().toLowerCase();
-  const matches = q
-    ? zoneOptions.filter((z) =>
-        z.toLowerCase().includes(q)
-        || shortZone(z).toLowerCase().includes(q)
-        || zoneCode(now, z).toLowerCase().includes(q)
-        || fullName(z, now).toLowerCase().includes(q)
-        || gmtLabel(now, z).toLowerCase().includes(q)).slice(0, 8)
+  const matches = query.trim()
+    ? matchingZones(query, now)
     : zoneOptions.filter((z) => !planner.zones.includes(z)).slice(0, 8);
 
   const inRange = (i: number | null): i is number => i !== null && i >= 0 && i < HOURS;

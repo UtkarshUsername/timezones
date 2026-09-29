@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { canAccessApp, createClient, Link, retryAuth, SignInWithGoogle, useAuth, useParams } from "lakebed/client";
 import type app from "../server/index";
+import { canonZone, gmtLabel, matchingZones, shortZone, zoneCode, zoneOptions } from "./zones";
 
 const client = createClient<typeof app>();
-const zones = ["Asia/Kolkata", "Etc/UTC", "Europe/London", "Europe/Paris", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Asia/Dubai", "Asia/Singapore", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland"];
 const DAY = 86_400_000;
 const formatters = new Map<string, Intl.DateTimeFormat>();
 const displayFormatters = new Map<string, Intl.DateTimeFormat>();
@@ -49,6 +49,44 @@ function dateRange(a: string, b: string) {
 }
 const control = "rounded border border-[#d3d3d3] bg-white px-3 py-2 text-sm focus:border-[#1498e0] focus:outline-none";
 const primary = "rounded border border-[#b9cfe8] bg-[#1498e0] px-4 py-2 text-sm font-bold text-white hover:bg-[#0879bc] disabled:opacity-50";
+
+function ZonePicker({ value, onChange, label }: { value: string; onChange: (zone: string) => void; label: string }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const root = useRef<HTMLDivElement>(null);
+  const now = Date.now();
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  const matches = query.trim()
+    ? matchingZones(query, now)
+    : [value, ...zoneOptions.filter(z => z !== value)].slice(0, 8);
+  function choose(zone: string) { onChange(zone); setOpen(false); setQuery(""); }
+  return <div ref={root} className="relative min-w-0">
+    <label className="block text-xs font-bold text-slate-600">{label}
+      <input
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={label}
+        autoComplete="off"
+        className={`${control} mt-1.5 block w-full`}
+        onFocus={() => { setQuery(""); setOpen(true); }}
+        onInput={e => { setQuery(e.currentTarget.value); setOpen(true); }}
+        value={open ? query : `${zoneCode(now, value)} · ${shortZone(value)}`}
+      />
+    </label>
+    {open && <div role="listbox" className="absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded border border-[#ddd] bg-white shadow-lg">
+      {matches.map(z => <button key={z} type="button" role="option" data-zone={z} aria-selected={z === value} className="block w-full border-b border-slate-100 px-3 py-2 text-left text-xs hover:bg-[#dbe8f8] focus:bg-[#dbe8f8] focus:outline-none" onPointerDown={e => e.preventDefault()} onClick={e => choose(e.currentTarget.dataset.zone!)}>
+        <span className="flex justify-between gap-2"><span><b>{zoneCode(now, z)}</b> · {shortZone(z)}</span><span className="shrink-0 text-slate-500">{gmtLabel(now, z)}</span></span>
+        <span className="block truncate text-slate-500">{z}</span>
+      </button>)}
+      {matches.length === 0 && <p className="px-3 py-2 text-xs text-slate-500">No matches</p>}
+    </div>}
+  </div>;
+}
 
 function Gate({ children }: { children: any }) {
   const auth = useAuth();
@@ -119,7 +157,7 @@ function PollCreateContent() {
   const create = client.useMutation("createPoll");
   const [title, setTitle] = useState("");
   const [dates, setDates] = useState<string[]>([]);
-  const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC");
+  const [zone, setZone] = useState(() => canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "Etc/UTC"));
   const [startHour, setStartHour] = useState(9);
   const [endHour, setEndHour] = useState(17);
   const [error, setError] = useState("");
@@ -136,7 +174,7 @@ function PollCreateContent() {
       <form onSubmit={e => void submit(e)} className="mt-7 space-y-6">
         <label className="block text-sm font-bold">Event name<input className={`${control} mt-2 w-full py-3`} value={title} maxLength={100} placeholder="Team catch-up" onInput={e => setTitle(e.currentTarget.value)} required /></label>
         <section><h2 className="mb-2 text-sm font-bold">What dates might work?</h2><Calendar dates={dates} onChange={setDates} /></section>
-        <section><h2 className="mb-3 text-sm font-bold">What times might work?</h2><div className="grid grid-cols-2 gap-3"><label className="min-w-0 text-xs font-bold">No earlier than<select className={`${control} mt-2 w-full`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2, "0")}:00</option>)}</select></label><label className="min-w-0 text-xs font-bold">No later than<select className={`${control} mt-2 w-full`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i + 1}>{String(i + 1).padStart(2, "0")}:00</option>)}</select></label></div><label className="mt-4 block text-xs font-bold">Time zone<select className={`${control} mt-2 w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label>{endHour <= startHour && <p className="mt-2 text-xs text-red-700">Choose an end time after the start time.</p>}</section>
+        <section><h2 className="mb-3 text-sm font-bold">What times might work?</h2><div className="grid grid-cols-2 gap-3"><label className="min-w-0 text-xs font-bold">No earlier than<select className={`${control} mt-2 w-full`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2, "0")}:00</option>)}</select></label><label className="min-w-0 text-xs font-bold">No later than<select className={`${control} mt-2 w-full`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i + 1}>{String(i + 1).padStart(2, "0")}:00</option>)}</select></label></div><div className="mt-4"><ZonePicker value={zone} onChange={setZone} label="Time zone" /></div>{endHour <= startHour && <p className="mt-2 text-xs text-red-700">Choose an end time after the start time.</p>}</section>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className={`${primary} w-full py-3`}>{busy ? "Creating…" : "Create poll →"}</button>
       </form>
@@ -266,7 +304,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const [name, setName] = useState(mine?.name || "");
   const [joined, setJoined] = useState(Boolean(mine));
   const [selected, setSelected] = useState<number[]>(() => mine ? JSON.parse(mine.slots) : []);
-  const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || poll.zone);
+  const [zone, setZone] = useState(() => canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || poll.zone));
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -302,7 +340,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
       <div className="mt-5 border-b border-slate-200 pb-5">
         <div className="grid gap-3 min-[430px]:grid-cols-2 min-[430px]:items-end">
           <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-xs font-bold text-slate-600">Your name<div className="mt-1.5 flex gap-2"><input className={`${control} min-w-0 flex-1`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required />{!joined && <button className="shrink-0 rounded border border-[#d0a33b] bg-[#f5c04e] px-3 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join"}</button>}</div></label></form>
-          <label className="min-w-0 text-xs font-bold text-slate-600">Show times in<select className={`${control} mt-1.5 block w-full`} value={zone} onChange={e => setZone(e.currentTarget.value)}>{[...new Set([zone, poll.zone, ...zones])].map(z => <option value={z}>{z}</option>)}</select></label>
+          <ZonePicker value={zone} onChange={setZone} label="Show times in" />
         </div>
         {(status || joined) && <p role="status" className="mt-2 text-xs text-slate-600">{status || "Changes save automatically"}</p>}
       </div>
