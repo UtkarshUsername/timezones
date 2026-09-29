@@ -274,7 +274,7 @@ function Grid({ poll, dates, zone, selected, counts, people, editable, onPaint }
               aria-label={format(slot.ts, zone, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + ", " + (counts ? count + " of " + max + " available" : active ? "available" : "unavailable")}
               aria-describedby={counts && tooltip?.index === index ? "availability-tooltip" : undefined}
               aria-pressed={editable ? active : undefined}
-              className={"h-6 border-t border-r border-[#cad6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f5c04e] sm:h-[15px] " + topBorder + " " + (editable ? "cursor-crosshair hover:outline hover:outline-2 hover:outline-[#f5c04e] touch-none" : "cursor-default")}
+              className={"h-6 border-t border-r border-[#cad6e0] focus-visible:shadow-[inset_0_0_0_2px_#f5c04e] sm:h-[15px] " + topBorder + " " + (editable ? "cursor-crosshair hover:shadow-[inset_0_0_0_2px_#f5c04e] touch-none" : "cursor-default")}
               style={{ backgroundColor: bg }}
               onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
               onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) showTooltip(e.currentTarget, index, true); }}
