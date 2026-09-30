@@ -2,7 +2,7 @@
 
 Compare a time range across cities, or create a group availability poll.
 
-[Open the app](https://timezones.lakebed.app)
+Use it here: https://timezones.lakebed.app
 
 ## Group polls
 
