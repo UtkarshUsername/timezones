@@ -345,6 +345,18 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const counts = Array.from({ length: dates.length * perDay }, (_, i) => people.reduce((count, person) => count + (person.chosen.has(i) ? 1 : 0), 0));
   const peakAvailability = counts.reduce((highest, count) => Math.max(highest, count), 0);
   useEffect(() => {
+    // Live responses are authoritative once this device has no pending edits.
+    if (dirty || busy) return;
+    setJoined(Boolean(mine));
+    if (mine) {
+      setName(mine.name);
+      setSelected(JSON.parse(mine.slots) as number[]);
+    } else if (joined) {
+      setName("");
+      setSelected([]);
+    }
+  }, [mine?.id, mine?.name, mine?.slots, dirty, busy, joined]);
+  useEffect(() => {
     const activeGrid = mobileView === "your" ? yourGridScroll.current : groupGridScroll.current;
     if (activeGrid) activeGrid.scrollLeft = scrollPosition.current;
   }, [mobileView]);
