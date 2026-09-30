@@ -94,12 +94,12 @@ function Gate({ children }: { children: any }) {
   if (!canAccessApp()) return <main className="mx-auto max-w-xl p-6"><p role="alert">{auth.error || "Sign in to continue"}</p><button className="mr-3 underline" onClick={() => void retryAuth()}>Retry</button><SignInWithGoogle /></main>;
   return children;
 }
-function Shell({ children }: { children: any }) {
+function Shell({ children, showAllPolls = true }: { children: any; showAllPolls?: boolean }) {
   return <main className="min-h-screen bg-white text-slate-900" style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
     <div className="mx-auto max-w-[1100px] px-3 py-4">
       <nav className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 text-sm">
         <Link to="/" className="text-lg font-bold tracking-tight text-black">Timezones</Link>
-        <Link to="/polls" className="rounded border border-[#ddd] px-3 py-2 font-bold hover:bg-[#dbe8f8]">All polls</Link>
+        {showAllPolls && <Link to="/polls" className="py-2 text-slate-600 underline-offset-4 hover:text-[#0879bc] hover:underline">All polls</Link>}
       </nav>
       {children}
     </div>
@@ -109,7 +109,7 @@ function Shell({ children }: { children: any }) {
 export function PollsHome() { return <Gate><PollsHomeContent /></Gate>; }
 function PollsHomeContent() {
   const polls = client.useQuery("myPolls");
-  return <Shell>
+  return <Shell showAllPolls={false}>
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4"><h1 className="text-2xl font-bold">Group polls</h1><Link to="/polls/new" className={primary}>Create a poll</Link></div>
     <h2 className="mb-3 border-b border-[#ddd] pb-2 text-sm font-bold">Your polls</h2>
     {polls === undefined ? <p className="text-sm text-gray-500">Loading…</p> : polls.length ? <div className="grid gap-2 sm:grid-cols-2">{polls.map(p => <Link key={p.id} to={`/polls/${p.id}`} className="rounded border border-[#ddd] bg-[#f7f9fc] p-4 hover:border-[#1498e0]"><strong className="block text-base">{p.title}</strong><span className="mt-1 block text-xs text-gray-500">{(JSON.parse(p.dates) as string[]).length} dates · {p.zone}</span></Link>)}</div> : <p className="rounded border border-dashed border-[#ddd] p-6 text-sm text-gray-500">No polls yet. Create one to start.</p>}
@@ -143,7 +143,7 @@ function Calendar({ dates, onChange }: { dates: string[]; onChange: (dates: stri
     if (date && date >= today && date <= last) select(date, drag.current);
   }
   return <div className="rounded-lg border border-[#d9e2ec] bg-[#f7f9fc] p-3 sm:p-4">
-    <div className="mb-3 flex items-center justify-between gap-2"><button type="button" aria-label="Previous month" className="h-9 w-9 rounded-lg border border-[#d9e2ec] bg-white text-base hover:border-[#1498e0]" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><strong className="text-[15px]">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong><button type="button" aria-label="Next month" className="h-9 w-9 rounded-lg border border-[#d9e2ec] bg-white text-base hover:border-[#1498e0]" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div>
+    <div className="mb-3 flex items-center justify-between gap-2"><button type="button" aria-label="Previous month" className="h-9 w-9 rounded-lg border border-[#d9e2ec] inline-flex items-center justify-center bg-white text-slate-600 hover:border-[#1498e0] hover:text-[#0879bc]" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg></button><strong className="text-[15px]">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</strong><button type="button" aria-label="Next month" className="h-9 w-9 rounded-lg border border-[#d9e2ec] inline-flex items-center justify-center bg-white text-slate-600 hover:border-[#1498e0] hover:text-[#0879bc]" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg></button></div>
     <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">{"SMTWTFS".split("").map((d, i) => <span key={i}>{d}</span>)}</div>
     <div className="mt-2 grid grid-cols-7 gap-1 touch-pan-y" onPointerMove={move} onPointerUp={() => drag.current = null} onPointerCancel={() => drag.current = null}>
       {cells.map(date => { const active = dates.includes(date); const outside = new Date(`${date}T12:00:00Z`).getUTCMonth() !== month.getMonth(); const disabled = date < today || date > last; return <button key={date} data-date={date} type="button" disabled={disabled} aria-label={date} aria-pressed={active} className={`h-9 rounded-md border text-xs font-bold touch-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1498e0] ${active ? "border-[#0879bc] bg-[#1498e0] text-white" : outside ? "border-transparent bg-white text-gray-400" : "border-[#d4dce7] bg-[#e8f0f9] text-slate-800 hover:border-[#1498e0] hover:bg-[#dbe8f8]"} disabled:opacity-30`} onPointerDown={e => begin(e, date)} onClick={e => { if (e.detail === 0) onChange(active ? dates.filter(d => d !== date) : [...dates, date].sort()); }}>{Number(date.slice(-2))}</button>; })}
@@ -176,7 +176,7 @@ function PollCreateContent() {
         <section><h2 className="mb-2 text-sm font-bold">What dates might work?</h2><Calendar dates={dates} onChange={setDates} /></section>
         <section><h2 className="mb-3 text-sm font-bold">What times might work?</h2><div className="grid grid-cols-2 gap-3"><label className="min-w-0 text-xs font-bold">No earlier than<select className={`${control} mt-2 w-full`} value={startHour} onChange={e => setStartHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i}>{String(i).padStart(2, "0")}:00</option>)}</select></label><label className="min-w-0 text-xs font-bold">No later than<select className={`${control} mt-2 w-full`} value={endHour} onChange={e => setEndHour(Number(e.currentTarget.value))}>{Array.from({ length: 24 }, (_, i) => <option value={i + 1}>{String(i + 1).padStart(2, "0")}:00</option>)}</select></label></div><div className="mt-4"><ZonePicker value={zone} onChange={setZone} label="Time zone" /></div>{endHour <= startHour && <p className="mt-2 text-xs text-red-700">Choose an end time after the start time.</p>}</section>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-        <button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className={`${primary} w-full py-3`}>{busy ? "Creating…" : "Create poll →"}</button>
+        <button disabled={busy || !title.trim() || !dates.length || endHour <= startHour} className={`${primary} w-full py-3`}>{busy ? "Creating…" : "Create poll"}</button>
       </form>
     </div>
   </Shell>;
