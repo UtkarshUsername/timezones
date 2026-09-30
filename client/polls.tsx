@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { canAccessApp, createClient, Link, retryAuth, SignInWithGoogle, useAuth, useParams } from "lakebed/client";
+import { canAccessApp, createClient, Link, retryAuth, SignInWithGoogle, signOut, useAuth, useParams } from "lakebed/client";
 import type app from "../server/index";
 import { canonZone, gmtLabel, matchingZones, shortZone, zoneCode, zoneOptions } from "./zones";
 
@@ -95,18 +95,36 @@ function Gate({ children }: { children: any }) {
   return children;
 }
 function Shell({ children, showAllPolls = true }: { children: any; showAllPolls?: boolean }) {
+  const auth = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState("");
+  async function leaveAccount() {
+    setSigningOut(true);
+    setError("");
+    try { await signOut(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not sign out"); }
+    finally { setSigningOut(false); }
+  }
   return <main className="min-h-screen bg-white text-slate-900" style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
     <div className="mx-auto max-w-[1100px] px-3 py-4">
       <nav className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 text-sm">
         <Link to="/" className="text-lg font-bold tracking-tight text-black">Timezones</Link>
-        {showAllPolls && <Link to="/polls" className="py-2 text-slate-600 underline-offset-4 hover:text-[#0879bc] hover:underline">All polls</Link>}
+        <div className="flex flex-wrap items-center gap-3">
+          {showAllPolls && <Link to="/polls" className="py-2 text-slate-600 underline-offset-4 hover:text-[#0879bc] hover:underline">All polls</Link>}
+          {auth.isSignedIn ? <><span className="text-xs text-slate-600">Signed in with Google</span><button type="button" className={control} disabled={signingOut} onClick={() => void leaveAccount()}>{signingOut ? "Signing out…" : "Sign out"}</button></> : <SignInWithGoogle className={control} />}
+        </div>
       </nav>
+      {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
+      {auth.isGuest && <p className="mb-4 text-xs text-slate-500">You can participate as a guest. Sign in to keep your polls and availability across devices.</p>}
       {children}
     </div>
   </main>;
 }
 
 export function PollsHome() { return <Gate><PollsHomeContent /></Gate>; }
+export function PollAuthCallback() {
+  return <Gate><Shell><p className="mb-3 text-sm">Your session is ready.</p><Link to="/polls" className={primary}>Continue to polls</Link></Shell></Gate>;
+}
 function PollsHomeContent() {
   const polls = client.useQuery("myPolls");
   return <Shell showAllPolls={false}>
@@ -297,17 +315,20 @@ function AvailabilityLegend({ total, peak }: { total: number; peak: number }) {
 }
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
 function PollPageContent() {
+  const auth = useAuth();
   const { id } = useParams<{ id: string }>();
   const data = client.useQuery("poll", id);
   if (data === undefined) return <Shell><p className="text-sm">Loading poll…</p></Shell>;
   if (!data) return <Shell><h1 className="text-xl font-bold">Poll not found</h1><Link to="/polls" className="text-blue-600 underline">Back to polls</Link></Shell>;
-  return <PollDetail key={id} data={data} id={id} />;
+  return <PollDetail key={`${id}:${auth.userId}`} data={data} id={id} />;
 }
 function PollDetail({ data, id }: { data: PollData; id: string }) {
+  const auth = useAuth();
   const { poll, responses } = data;
   const save = client.useMutation("saveResponse");
   const mine = responses.find(r => r.isMine);
-  const [name, setName] = useState(mine?.name || "");
+  const defaultName = auth.isSignedIn ? auth.displayName.trim().slice(0, 50) : "";
+  const [name, setName] = useState(mine?.name ?? defaultName);
   const [joined, setJoined] = useState(Boolean(mine));
   const [selected, setSelected] = useState<number[]>(() => mine ? JSON.parse(mine.slots) : []);
   const [zone, setZone] = useState(() => canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || poll.zone));
@@ -325,6 +346,18 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
   const people = useMemo(() => responses.map(r => ({ name: r.name, chosen: new Set(JSON.parse(r.slots) as number[]) })).filter(person => person.chosen.size > 0), [responses]);
   const counts = Array.from({ length: dates.length * perDay }, (_, i) => people.reduce((count, person) => count + (person.chosen.has(i) ? 1 : 0), 0));
   const peakAvailability = counts.reduce((highest, count) => Math.max(highest, count), 0);
+  useEffect(() => {
+    // Live responses are authoritative once this device has no pending edits.
+    if (dirty || busy) return;
+    setJoined(Boolean(mine));
+    if (mine) {
+      setName(mine.name);
+      setSelected(JSON.parse(mine.slots) as number[]);
+    } else if (joined) {
+      setName(defaultName);
+      setSelected([]);
+    }
+  }, [mine?.id, mine?.name, mine?.slots, dirty, busy, joined, defaultName]);
   useEffect(() => {
     const activeGrid = mobileView === "your" ? yourGridScroll.current : groupGridScroll.current;
     if (activeGrid) activeGrid.scrollLeft = scrollPosition.current;
@@ -358,7 +391,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
       </div>
       <div className="mt-5 border-b border-slate-200 pb-5">
         <div className="grid gap-3 min-[430px]:grid-cols-2 min-[430px]:items-end">
-          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-xs font-bold text-slate-600">Your name<div className="mt-1.5 flex gap-2"><input className={`${control} min-w-0 flex-1`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required />{!joined && <button className="shrink-0 rounded border border-[#d0a33b] bg-[#f5c04e] px-3 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join"}</button>}</div></label></form>
+          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-xs font-bold text-slate-600">{auth.isSignedIn ? "Display Name" : "Your name"}<div className="mt-1.5 flex gap-2"><input className={`${control} min-w-0 flex-1`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required />{!joined && <button className="shrink-0 rounded border border-[#d0a33b] bg-[#f5c04e] px-3 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join"}</button>}</div></label></form>
           <ZonePicker value={zone} onChange={setZone} label="Show times in" />
         </div>
         {(status || joined) && <p role="status" className="mt-2 text-xs text-slate-600">{status || "Changes save automatically"}</p>}

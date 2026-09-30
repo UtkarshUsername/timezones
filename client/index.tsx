@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Link, Route, Router, Routes } from "lakebed/client";
-import { PollCreate, PollPage, PollsHome } from "./polls";
+import { PollAuthCallback, PollCreate, PollPage, PollsHome } from "./polls";
 import { canonZone, fullName, gmtLabel, matchingZones, offsetMinutes, shortZone, zoneCode, zoneOptions } from "./zones";
 
 type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string; startTs?: number; endTs?: number };
@@ -435,7 +435,7 @@ export function PlannerApp() {
 }
 
 export function App() {
-  return <Router><Routes><Route path="/" element={<PlannerApp />} /><Route path="/polls" element={<PollsHome />} /><Route path="/polls/new" element={<PollCreate />} /><Route path="/polls/:id" element={<PollPage />} /></Routes></Router>;
+  return <Router><Routes><Route path="/" element={<PlannerApp />} /><Route path="/auth/callback" element={<PollAuthCallback />} /><Route path="/polls" element={<PollsHome />} /><Route path="/polls/new" element={<PollCreate />} /><Route path="/polls/:id" element={<PollPage />} /></Routes></Router>;
 }
 
 
