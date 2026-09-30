@@ -13,7 +13,22 @@ function parseDates(raw: string): string[] {
 }
 export default capsule({
   name: "timezones",
-  auth: { requireSignIn: false },
+  auth: {
+    requireSignIn: false,
+    onGuestUpgrade: async (ctx, { guestUserId, userId }) => {
+      const guestResponses = await ctx.db.responses.withIndex("by_owner", q => q.eq("ownerId", guestUserId)).collect();
+      if (!guestResponses.length) return;
+      const accountResponses = await ctx.db.responses.withIndex("by_owner", q => q.eq("ownerId", userId)).collect();
+      const accountByPoll = new Map(accountResponses.map(response => [response.pollId, response]));
+      for (const guest of guestResponses) {
+        const account = accountByPoll.get(guest.pollId);
+        if (!account) continue;
+        const slots = [...new Set([...parseSlots(account.slots), ...parseSlots(guest.slots)])].sort((a, b) => a - b);
+        await ctx.db.responses.update(account.id, { name: guest.name, slots: JSON.stringify(slots) });
+        await ctx.db.responses.delete(guest.id);
+      }
+    }
+  },
   schema: {
     polls: table({ title: string(), dates: string(), zone: string(), startHour: number(), endHour: number(), duration: number(), ownerId: userId() }).index("by_owner", ["ownerId"]),
     responses: table({ pollId: id("polls"), ownerId: userId(), name: string(), slots: string() }).index("by_poll", ["pollId"]).index("by_owner_poll", ["ownerId", "pollId"])
