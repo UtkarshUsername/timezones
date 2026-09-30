@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { canAccessApp, createClient, Link, retryAuth, SignInWithGoogle, useAuth, useParams } from "lakebed/client";
+import { canAccessApp, createClient, Link, retryAuth, SignInWithGoogle, signOut, useAuth, useParams } from "lakebed/client";
 import type app from "../server/index";
 import { canonZone, gmtLabel, matchingZones, shortZone, zoneCode, zoneOptions } from "./zones";
 
@@ -95,12 +95,27 @@ function Gate({ children }: { children: any }) {
   return children;
 }
 function Shell({ children, showAllPolls = true }: { children: any; showAllPolls?: boolean }) {
+  const auth = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState("");
+  async function leaveAccount() {
+    setSigningOut(true);
+    setError("");
+    try { await signOut(); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not sign out"); }
+    finally { setSigningOut(false); }
+  }
   return <main className="min-h-screen bg-white text-slate-900" style={{ fontFamily: "Verdana, Arial, Helvetica, sans-serif" }}>
     <div className="mx-auto max-w-[1100px] px-3 py-4">
       <nav className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 text-sm">
         <Link to="/" className="text-lg font-bold tracking-tight text-black">Timezones</Link>
-        {showAllPolls && <Link to="/polls" className="py-2 text-slate-600 underline-offset-4 hover:text-[#0879bc] hover:underline">All polls</Link>}
+        <div className="flex flex-wrap items-center gap-3">
+          {showAllPolls && <Link to="/polls" className="py-2 text-slate-600 underline-offset-4 hover:text-[#0879bc] hover:underline">All polls</Link>}
+          {auth.isSignedIn ? <><span className="text-xs text-slate-600">Signed in with Google</span><button type="button" className={control} disabled={signingOut} onClick={() => void leaveAccount()}>{signingOut ? "Signing out…" : "Sign out"}</button></> : <SignInWithGoogle className={control} />}
+        </div>
       </nav>
+      {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
+      {auth.isGuest && <p className="mb-4 text-xs text-slate-500">You can participate as a guest. Sign in to keep your polls and availability across devices.</p>}
       {children}
     </div>
   </main>;
@@ -297,11 +312,12 @@ function AvailabilityLegend({ total, peak }: { total: number; peak: number }) {
 }
 export function PollPage() { return <Gate><PollPageContent /></Gate>; }
 function PollPageContent() {
+  const auth = useAuth();
   const { id } = useParams<{ id: string }>();
   const data = client.useQuery("poll", id);
   if (data === undefined) return <Shell><p className="text-sm">Loading poll…</p></Shell>;
   if (!data) return <Shell><h1 className="text-xl font-bold">Poll not found</h1><Link to="/polls" className="text-blue-600 underline">Back to polls</Link></Shell>;
-  return <PollDetail key={id} data={data} id={id} />;
+  return <PollDetail key={`${id}:${auth.userId}`} data={data} id={id} />;
 }
 function PollDetail({ data, id }: { data: PollData; id: string }) {
   const { poll, responses } = data;
