@@ -323,10 +323,12 @@ function PollPageContent() {
   return <PollDetail key={`${id}:${auth.userId}`} data={data} id={id} />;
 }
 function PollDetail({ data, id }: { data: PollData; id: string }) {
+  const auth = useAuth();
   const { poll, responses } = data;
   const save = client.useMutation("saveResponse");
   const mine = responses.find(r => r.isMine);
-  const [name, setName] = useState(mine?.name || "");
+  const defaultName = auth.isSignedIn ? auth.displayName.trim().slice(0, 50) : "";
+  const [name, setName] = useState(mine?.name ?? defaultName);
   const [joined, setJoined] = useState(Boolean(mine));
   const [selected, setSelected] = useState<number[]>(() => mine ? JSON.parse(mine.slots) : []);
   const [zone, setZone] = useState(() => canonZone(Intl.DateTimeFormat().resolvedOptions().timeZone || poll.zone));
@@ -352,10 +354,10 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
       setName(mine.name);
       setSelected(JSON.parse(mine.slots) as number[]);
     } else if (joined) {
-      setName("");
+      setName(defaultName);
       setSelected([]);
     }
-  }, [mine?.id, mine?.name, mine?.slots, dirty, busy, joined]);
+  }, [mine?.id, mine?.name, mine?.slots, dirty, busy, joined, defaultName]);
   useEffect(() => {
     const activeGrid = mobileView === "your" ? yourGridScroll.current : groupGridScroll.current;
     if (activeGrid) activeGrid.scrollLeft = scrollPosition.current;
@@ -389,7 +391,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
       </div>
       <div className="mt-5 border-b border-slate-200 pb-5">
         <div className="grid gap-3 min-[430px]:grid-cols-2 min-[430px]:items-end">
-          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-xs font-bold text-slate-600">Your name<div className="mt-1.5 flex gap-2"><input className={`${control} min-w-0 flex-1`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required />{!joined && <button className="shrink-0 rounded border border-[#d0a33b] bg-[#f5c04e] px-3 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join"}</button>}</div></label></form>
+          <form onSubmit={e => void join(e)} className="min-w-0"><label className="block text-xs font-bold text-slate-600">{auth.isSignedIn ? "Display Name" : "Your name"}<div className="mt-1.5 flex gap-2"><input className={`${control} min-w-0 flex-1`} value={name} maxLength={50} onInput={e => { editRevision.current++; setName(e.currentTarget.value); if (joined) setDirty(true); }} required />{!joined && <button className="shrink-0 rounded border border-[#d0a33b] bg-[#f5c04e] px-3 text-sm font-bold disabled:opacity-50" disabled={busy || !name.trim()}>{busy ? "Joining…" : "Join"}</button>}</div></label></form>
           <ZonePicker value={zone} onChange={setZone} label="Show times in" />
         </div>
         {(status || joined) && <p role="status" className="mt-2 text-xs text-slate-600">{status || "Changes save automatically"}</p>}
