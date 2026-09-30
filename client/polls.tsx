@@ -122,6 +122,9 @@ function Shell({ children, showAllPolls = true }: { children: any; showAllPolls?
 }
 
 export function PollsHome() { return <Gate><PollsHomeContent /></Gate>; }
+export function PollAuthCallback() {
+  return <Gate><Shell><p className="mb-3 text-sm">Your session is ready.</p><Link to="/polls" className={primary}>Continue to polls</Link></Shell></Gate>;
+}
 function PollsHomeContent() {
   const polls = client.useQuery("myPolls");
   return <Shell showAllPolls={false}>
