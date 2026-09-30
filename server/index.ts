@@ -16,9 +16,9 @@ export default capsule({
   auth: {
     requireSignIn: false,
     onGuestUpgrade: async (ctx, { guestUserId, userId }) => {
-      const guestResponses = await ctx.db.responses.withIndex("by_owner", q => q.eq("ownerId", guestUserId)).collect();
+      const guestResponses = await ctx.db.responses.withIndex("by_owner_poll", q => q.eq("ownerId", guestUserId)).collect();
       if (!guestResponses.length) return;
-      const accountResponses = await ctx.db.responses.withIndex("by_owner", q => q.eq("ownerId", userId)).collect();
+      const accountResponses = await ctx.db.responses.withIndex("by_owner_poll", q => q.eq("ownerId", userId)).collect();
       const accountByPoll = new Map(accountResponses.map(response => [response.pollId, response]));
       for (const guest of guestResponses) {
         const account = accountByPoll.get(guest.pollId);
