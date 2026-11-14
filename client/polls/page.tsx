@@ -1,7 +1,7 @@
 import { useMemo, useState } from "preact/hooks";
 import { Link, useAuth, useParams } from "lakebed/client";
 import { NAME_LENGTH } from "../../shared/polls";
-import { canonZone } from "../zones";
+import { canonZone } from "../../shared/time";
 import { client } from "./api";
 import type { PollData } from "./api";
 import { Gate, Shell } from "./session";
@@ -59,7 +59,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
           <section id="your-availability" className={(mobileView === "your" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
             <h2 className="hidden text-sm font-bold sm:block sm:text-base lg:text-lg">Your availability</h2>
             <p className="mb-3 mt-1 text-sm text-slate-600">{joined ? "Select or drag to mark your times." : "Join the poll above to mark your times."}</p>
-            <Grid model={model} zone={zone} mode={{ kind: "edit", selected: new Set(selected), enabled: joined, onPaint: (index, add) => { setShareStatus(""); paint(index, add); } }} {...grids.your} />
+            <Grid model={model} mode={{ kind: "edit", selected: new Set(selected), enabled: joined, onPaint: (index, add) => { setShareStatus(""); paint(index, add); } }} {...grids.your} />
           </section>
           <section id="group-availability" className={(mobileView === "group" ? "" : "hidden ") + "min-w-0 sm:row-span-3 sm:grid sm:grid-rows-subgrid sm:gap-y-0"}>
             <div className="hidden items-center justify-between gap-1.5 sm:flex">
@@ -68,7 +68,7 @@ function PollDetail({ data, id }: { data: PollData; id: string }) {
             </div>
             <p className="mb-3 mt-1 hidden text-sm text-slate-600 sm:block">Hover over a time to see who's free.</p>
             <div className="mb-3 mt-1 flex items-center justify-between gap-2 sm:hidden"><span className="shrink-0 text-xs text-slate-600">Tap for names</span><AvailabilityLegend total={people.length} peak={peakAvailability} /></div>
-            <Grid model={model} zone={zone} mode={{ kind: "group", availability }} {...grids.group} />
+            <Grid model={model} mode={{ kind: "group", availability }} {...grids.group} />
           </section>
         </div>
       </div>

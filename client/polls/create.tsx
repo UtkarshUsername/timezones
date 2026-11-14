@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { canonZone } from "../zones";
+import { canonZone } from "../../shared/time";
 import { TITLE_LENGTH } from "../../shared/polls";
 import { client } from "./api";
 import { Gate, Shell } from "./session";

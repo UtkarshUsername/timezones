@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { HOUR } from "../../shared/time";
-import { anchorFor, changeDate, initialState, removeZone, restoreState, snap15 } from "./model";
+import { TIMELINE_HOURS, anchorFor, changeDate, initialState, removeZone, restoreState, snap15 } from "./model";
 import type { PlannerState } from "./model";
 
 type Theme = "light" | "dark";
@@ -55,11 +55,16 @@ export function usePlanner() {
     setWindowStart(anchorFor(ts));
     setScrollRequest({ index: (ts - anchorFor(ts)) / HOUR });
   }
-  function select(from: number, to: number, zone: string, visibleHours: number) {
+  function selectHour(ts: number, zone: string) {
+    const start = snap15(ts);
+    if (start < windowStart || start >= windowStart + TIMELINE_HOURS * HOUR) center(start);
+    update({ sourceZone: zone, range: { start, end: start + HOUR } });
+  }
+  function selectRange(from: number, to: number, zone: string) {
     const start = snap15(Math.min(from, to));
     const snappedEnd = snap15(Math.max(from, to));
     const end = snappedEnd > start ? snappedEnd : start + HOUR;
-    if (start < windowStart || end >= windowStart + visibleHours * HOUR) center(start);
+    if (start < windowStart || end >= windowStart + TIMELINE_HOURS * HOUR) center(start);
     update({ sourceZone: zone, range: { start, end } });
   }
   function setDate(date: string) {
@@ -77,5 +82,5 @@ export function usePlanner() {
     setPlanner(current => removeZone(current, zone));
     requestScroll();
   }
-  return { planner, update, theme, setTheme, hour12, setHour12, now, windowStart, scrollRequest, select, setDate, today, remove };
+  return { planner, update, theme, setTheme, hour12, setHour12, now, windowStart, scrollRequest, selectHour, selectRange, setDate, today, remove };
 }

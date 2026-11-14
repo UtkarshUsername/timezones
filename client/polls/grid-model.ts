@@ -4,6 +4,7 @@ import type { PollSchedule } from "../../shared/polls";
 
 type Slot = { index: number; ts: number };
 export type GridModel = {
+  zone: string;
   days: { date: string; first: number; byTime: Map<string, Slot> }[];
   times: string[];
   slotCount: number;
@@ -34,7 +35,7 @@ export function buildGrid(poll: PollSchedule, zone: string): GridModel {
     }
     return { date, first: items[0].ts, byTime };
   });
-  return { days, times: [...new Set(days.flatMap(day => [...day.byTime.keys()]))].sort(), slotCount: slots.length };
+  return { zone, days, times: [...new Set(days.flatMap(day => [...day.byTime.keys()]))].sort(), slotCount: slots.length };
 }
 
 export function groupAvailability(responses: { name: string; slots: string }[], slotCount: number) {

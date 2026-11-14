@@ -16,7 +16,7 @@ export function Calendar({ dates, onChange }: { dates: string[]; onChange: (date
   function begin(e: PointerEvent, date: string) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     drag.current = { anchor: date, add: !dates.includes(date), original: dates };
-    (e.currentTarget as HTMLElement).parentElement?.setPointerCapture(e.pointerId);
+    root.current?.setPointerCapture(e.pointerId);
     select(date, drag.current);
   }
   function move(e: PointerEvent) {

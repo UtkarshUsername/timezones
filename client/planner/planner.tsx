@@ -4,11 +4,11 @@ import { fullName, gmtLabel, matchingZones, shortZone, zoneCode, zoneOptions } f
 
 import { dateInput, formatInZone, timeInput } from "../../shared/time";
 
+import { TIMELINE_HOURS as HOURS } from "./model";
 import { usePlanner } from "./use-planner";
 
 const CELL_W = 62;
 const CELL_GAP = 3;
-const HOURS = 48;
 const STRIP_W = HOURS * (CELL_W + CELL_GAP);
 const NOW_COLOR = "#52b306";
 const SEL_COLOR = "#1498e0";
@@ -24,7 +24,7 @@ function fmtTime(ts: number, zone: string, hour12: boolean) {
     : formatInZone(ts, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 export function PlannerApp() {
-  const { planner, update, theme, setTheme, hour12, setHour12, now, windowStart, scrollRequest, select, setDate: changeDate, today: goToday, remove: removeZone } = usePlanner();
+  const { planner, update, theme, setTheme, hour12, setHour12, now, windowStart, scrollRequest, selectHour, selectRange, setDate: changeDate, today: goToday, remove: removeZone } = usePlanner();
   const selectedRange = planner.range;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -62,8 +62,6 @@ export function PlannerApp() {
     [zones[i], zones[j]] = [zones[j], zones[i]];
     update({ zones });
   }
-  function selectHour(ts: number, zone: string) { select(ts, ts + 3600_000, zone, HOURS); }
-  function selectRange(from: number, to: number, zone: string) { select(from, to, zone, HOURS); }
   function tsAt(clientX: number, el: HTMLDivElement) {
     const r = el.getBoundingClientRect();
     const x = clientX - r.left;

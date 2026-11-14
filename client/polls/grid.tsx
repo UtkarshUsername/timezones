@@ -5,14 +5,13 @@ import type { GridModel, GroupAvailability } from "./grid-model";
 
 type GridMode = { kind: "edit"; selected: Set<number>; enabled: boolean; onPaint: (index: number, add: boolean) => void }
   | { kind: "group"; availability: GroupAvailability };
-export function Grid({ model, zone, mode, scrollRef, onScroll }: {
+export function Grid({ model, mode, scrollRef, onScroll }: {
   model: GridModel;
-  zone: string;
   mode: GridMode;
   scrollRef: { current: HTMLDivElement | null };
   onScroll: (left: number) => void;
 }) {
-  const { days, times } = model;
+  const { days, times, zone } = model;
   const group = mode.kind === "group" ? mode.availability : undefined;
   const counts = group?.counts;
   const people = group?.people;
@@ -87,7 +86,7 @@ export function Grid({ model, zone, mode, scrollRef, onScroll }: {
               aria-pressed={editable ? active : undefined}
               className={"h-6 border-t border-r border-[#cad6e0] focus-visible:shadow-[inset_0_0_0_2px_#f5c04e] sm:h-[15px] " + topBorder + " " + (editable ? "cursor-crosshair hover:shadow-[inset_0_0_0_2px_#f5c04e] touch-none" : "cursor-default")}
               style={{ backgroundColor: bg }}
-              onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; (e.currentTarget.closest("[data-grid]") as HTMLElement)?.setPointerCapture(e.pointerId); touch(index); }}
+              onPointerDown={e => { if (!editable || !onPaint || (e.pointerType === "mouse" && e.button !== 0)) return; drag.current = { add: !active, touched: new Set() }; root.current?.setPointerCapture(e.pointerId); touch(index); }}
               onClick={e => { if (editable && onPaint && e.detail === 0) onPaint(index, !active); if (counts) showTooltip(e.currentTarget, index, true); }}
               onPointerEnter={e => { if (counts && e.pointerType !== "touch") showTooltip(e.currentTarget, index, false); }}
               onPointerLeave={e => { if (counts && e.pointerType !== "touch") setTooltip(current => current?.pinned ? current : null); }}

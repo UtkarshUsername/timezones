@@ -1,5 +1,4 @@
 import { canonZone, formatter, offsetMinutes } from "../shared/time";
-export { canonZone } from "../shared/time";
 
 export const zoneOptions = [
   "Pacific/Midway", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles",

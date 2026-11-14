@@ -1,5 +1,7 @@
 import { DAY, HOUR, MINUTE, canonZone, dateInput, dateKey, isDate, isZone, timeInput, zonedTimestamp } from "../../shared/time";
 
+export const TIMELINE_HOURS = 48;
+
 export type Range = { start: number; end: number };
 export type PlannerState = { zones: string[]; sourceZone: string; range: Range };
 

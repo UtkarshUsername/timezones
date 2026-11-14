@@ -52,10 +52,11 @@ export function validatePoll(input: CreatePollInput, now: number) {
   if (!Number.isInteger(input.startHour) || !Number.isInteger(input.endHour) || input.startHour < 0 || input.endHour > 24 || input.endHour <= input.startHour) {
     throw new Error("Invalid time range");
   }
-  if (dates.some(d => Date.parse(d) < now - DAY || Date.parse(d) > now + DATE_HORIZON_DAYS * DAY)) {
+  const { first, last } = pollDateBounds(now);
+  if (dates.some(date => date < first || date > last)) {
     throw new Error("Dates must be within the next year");
   }
-  return { ...input, title, dates: JSON.stringify(dates) };
+  return { title, dates: JSON.stringify(dates), zone: input.zone, startHour: input.startHour, endHour: input.endHour };
 }
 
 export function mergeAvailability(account: string, guest: string) {

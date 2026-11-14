@@ -94,7 +94,41 @@ ranges, grid presentation, response ownership, and response synchronization.
 
 ## Verification and review
 
-Pending: cohesive implementation commits, current build, pure domain behavior
-tests, real Lakebed guest isolation and reactive response checks, browser behavior
-checks, and independent subagent reviews of the final dependency graph and cases.
-Any new worthwhile review finding is recorded here before its fix.
+Implementation commits now separate shared rules, planner state/persistence,
+poll views/projection, and response editing. Builds and focused pure checks pass.
+
+Independent final reviews identified these follow-ups before their fixes:
+
+- Import timezone normalization directly from shared time code and delete its
+  forwarding export and the unused Poll alias in poll API types.
+- Include the display zone in GridModel so projection and labels cannot disagree.
+- Use the same civil-date bounds for calendar controls and server creation.
+- Preserve distinct viewport behavior for an hour click versus a range drag.
+  The first refactor recentered last-visible-hour clicks based on their end,
+  whereas the original checked only their start.
+- Capture pointers through owned calendar/grid refs instead of DOM nesting or
+  selector conventions.
+- Return explicit normalized poll fields from validation. Spreading input into
+  database rows forwards unknown fields that the baseline ignored.
+
+Pending: maintained behavioral tests, real Lakebed guest isolation/reactivity,
+browser behavior checks, and independent re-reviews after fixes.
+
+## Paused for draft PR
+
+The user requested a PR now and continuation later. All findings listed above
+have been implemented. The latest Lakebed build and `git diff --check` pass.
+Focused checks exercised DST gaps/overlaps, date rollover, canonical date
+validation, availability union, planner migration/overnight ranges, grid
+projection/aggregation, and stale editor save completion.
+
+Resume with:
+
+1. Add maintained behavioral tests, using relative dates and fresh guest names.
+   Historical ignored checks have expired dates and assume an empty database.
+2. Verify real guest isolation and reactive updates on the final code.
+3. Check desktop/mobile UI, keyboard and pointer input, autosave ordering,
+   cross-device reconciliation, and last-hour viewport behavior in a browser.
+4. Repeat independent reviews after fixes until no worthwhile issues remain.
+
+This refactor is unfinished and has not been deployed.
