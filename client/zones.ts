@@ -1,4 +1,5 @@
-import { formatter, offsetMinutes } from "../shared/time";
+import { canonZone, formatter, offsetMinutes } from "../shared/time";
+export { canonZone } from "../shared/time";
 
 export const zoneOptions = [
   "Pacific/Midway", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles",
@@ -15,8 +16,6 @@ export function shortZone(zone: string) {
   if (etc) return `GMT${etc[1] === "+" ? "-" : "+"}${Number(etc[2])}`;
   return zone.split("/").at(-1)?.replaceAll("_", " ") || zone;
 }
-
-export function canonZone(zone: string) { return zone === "Asia/Calcutta" ? "Asia/Kolkata" : zone; }
 
 export function zoneCode(ts: number, zone: string) {
   if (canonZone(zone) === "Asia/Kolkata") return "IST";

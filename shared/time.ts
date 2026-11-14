@@ -2,6 +2,14 @@ export const MINUTE = 60_000;
 export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;
 
+export function canonZone(zone: string) { return zone === "Asia/Calcutta" ? "Asia/Kolkata" : zone; }
+
+export function isZone(value: unknown): value is string {
+  if (typeof value !== "string" || !value) return false;
+  try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; }
+  catch { return false; }
+}
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 export function formatter(zone: string, options: Intl.DateTimeFormatOptions, locale = "en-GB") {
