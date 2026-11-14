@@ -62,6 +62,8 @@ ranges, grid presentation, response ownership, and response synchronization.
     passed independently. Make one derived group summary own them.
   - Hidden link: scroll refs, active mobile view and remembered scroll position
     cooperate through conventions; encapsulate synchronized-grid behavior.
+  - Hidden link (independent audit): document-wide drag hit tests and tooltip
+    dismissal accept cells from other grids. Scope them to the gesture root.
 - Give poll response editing one hook with a revision-aware serialized save path
   used by both joining and autosaving.
   - Hidden link: name edits and painting must increment editRevision and mark

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Link, Route, Router, Routes } from "lakebed/client";
 import { PollAuthCallback, PollCreate, PollPage, PollsHome } from "./polls";
-import { canonZone, fullName, gmtLabel, matchingZones, offsetMinutes, shortZone, zoneCode, zoneOptions } from "./zones";
+import { canonZone, fullName, gmtLabel, matchingZones, shortZone, zoneCode, zoneOptions } from "./zones";
+
+import { dateInput, formatInZone, timeInput, zonedTimestamp } from "../shared/time";
+
+function timeMinutes(time: string) { const [hour, minute] = time.split(":").map(Number); return hour * 60 + minute; }
 
 type SavedState = { zones: string[]; sourceZone: string; date: string; start: string; end: string; startTs?: number; endTs?: number };
 type Theme = "light" | "dark";
@@ -37,52 +41,16 @@ function loadState(): SavedState {
   if (!init.zones.includes(detected)) init.zones = [detected, ...init.zones].slice(0, 4);
   return init;
 }
-function formatInZone(ts: number, zone: string, o: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...o }).format(ts);
-}
-function zonedTimestamp(date: string, time: string, zone: string) {
-  const [y, mo, d] = date.split("-").map(Number);
-  const [h, mi] = time.split(":").map(Number);
-  const wall = Date.UTC(y, mo - 1, d, h || 0, mi || 0);
-  const offsets = new Set([
-    offsetMinutes(wall - 36 * 3600_000, zone),
-    offsetMinutes(wall, zone),
-    offsetMinutes(wall + 36 * 3600_000, zone),
-  ]);
-  const candidates = [...offsets].map((offset) => wall - offset * 60_000).sort((a, b) => a - b);
-  const requested = `${date}T${time}`;
-  const local = (ts: number) => `${dateInput(ts, zone)}T${timeInput(ts, zone)}`;
-  return candidates.find((ts) => local(ts) === requested)
-    ?? candidates.find((ts) => local(ts) > requested)
-    ?? candidates[candidates.length - 1];
-}
 function cellTone(hour: number): "day" | "mid" | "night" {
   if (hour >= 8 && hour <= 21) return "day";
   if (hour === 6 || hour === 7 || hour === 22 || hour === 23) return "mid";
   return "night";
 }
 function snap15(ts: number) { return Math.round(ts / 900_000) * 900_000; }
-function timeInput(ts: number, zone: string) {
-  return formatInZone(ts, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-}
 function fmtTime(ts: number, zone: string, hour12: boolean) {
   return hour12
     ? formatInZone(ts, zone, { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase()
     : formatInZone(ts, zone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-}
-function dateInput(ts: number, zone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(ts);
-  const g = (t: string) => parts.find((p) => p.type === t)?.value || "";
-  return `${g("year")}-${g("month")}-${g("day")}`;
-}
-const dayFmtCache = new Map<string, Intl.DateTimeFormat>();
-function dayKey(ts: number, zone: string) {
-  let f = dayFmtCache.get(zone);
-  if (!f) {
-    f = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" });
-    dayFmtCache.set(zone, f);
-  }
-  return f.format(ts);
 }
 function anchorFor(ts: number) {
   return Math.floor((ts - 18 * 3600_000) / 3600_000) * 3600_000;
@@ -105,7 +73,7 @@ export function PlannerApp() {
   useEffect(() => {
     const saved = loadState();
     setPlanner(saved);
-    try { setWindowStart(anchorFor(zonedTimestamp(saved.date, saved.start, saved.sourceZone))); } catch { /* keep default */ }
+    try { setWindowStart(anchorFor(zonedTimestamp(saved.date, timeMinutes(saved.start), saved.sourceZone))); } catch { /* keep default */ }
     const t = localStorage.getItem(THEME_KEY);
     if (t === "dark" || t === "light") setTheme(t);
     if (localStorage.getItem(HOUR12_KEY) === "0") setHour12(false);
@@ -135,20 +103,20 @@ export function PlannerApp() {
       && Number.isFinite(planner.startTs) && Number.isFinite(planner.endTs) && planner.endTs > planner.startTs) {
       return { start: planner.startTs, end: planner.endTs };
     }
-    const s = zonedTimestamp(planner.date, planner.start, planner.sourceZone);
+    const s = zonedTimestamp(planner.date, timeMinutes(planner.start), planner.sourceZone);
     let e: number;
-    try { e = zonedTimestamp(planner.date, planner.end, planner.sourceZone); } catch { e = s + 3600_000; }
+    try { e = zonedTimestamp(planner.date, timeMinutes(planner.end), planner.sourceZone); } catch { e = s + 3600_000; }
     if (e <= s) {
       if (timeInput(s, planner.sourceZone) !== planner.start && timeInput(s, planner.sourceZone) === planner.end) {
         e = s + 3600_000;
       } else {
         const [y, mo, d] = planner.date.split("-").map(Number);
         const nextDate = new Date(Date.UTC(y, mo - 1, d + 1)).toISOString().slice(0, 10);
-        e = zonedTimestamp(nextDate, planner.end, planner.sourceZone);
+        e = zonedTimestamp(nextDate, timeMinutes(planner.end), planner.sourceZone);
       }
     }
     return { start: s, end: e };
-  }, [planner.date, planner.end, planner.sourceZone, planner.start, planner.startTs, planner.endTs]);
+  }, [planner.date, timeMinutes(planner.end), planner.sourceZone, timeMinutes(planner.start), planner.startTs, planner.endTs]);
 
   const hours = useMemo(() => Array.from({ length: HOURS }, (_, i) => windowStart + i * 3600_000), [windowStart]);
 
@@ -161,7 +129,7 @@ export function PlannerApp() {
   function changeDate(d: string) {
     if (!d) return;
     update({ date: d, startTs: undefined, endTs: undefined });
-    try { setWindowStart(anchorFor(zonedTimestamp(d, planner.start, planner.sourceZone))); } catch { /* ignore */ }
+    try { setWindowStart(anchorFor(zonedTimestamp(d, timeMinutes(planner.start), planner.sourceZone))); } catch { /* ignore */ }
   }
   function addZone(z: string) {
     if (!zoneOptions.includes(z) || planner.zones.includes(z)) return;
@@ -381,7 +349,7 @@ export function PlannerApp() {
                           const ampm = parts12.toUpperCase().includes("AM") ? "am" : "pm";
                           const cellHour = hour12 ? digits : formatInZone(ts, zone, { hour: "2-digit", hourCycle: "h23" });
                           const cellMins = formatInZone(ts, zone, { minute: "2-digit" }).padStart(2, "0");
-                          const spansMidnight = dayKey(ts - 1, zone) !== dayKey(ts + 3599_999, zone);
+                          const spansMidnight = dateInput(ts - 1, zone) !== dateInput(ts + 3599_999, zone);
                           const bg = tone === "day" ? "bg-[#dbe8f8] text-black" : tone === "mid" ? "bg-[#8fb0c7] text-black" : "bg-[#2e4a5a] text-white";
                           const border = tone === "day" ? "border-[#b9cfe8]" : tone === "mid" ? "border-[#7ba0b8]" : "border-[#22394a]";
                           if (spansMidnight) {
