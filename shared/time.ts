@@ -59,7 +59,6 @@ export function offsetMinutes(ts: number, zone: string) {
   return match[1] === "+" ? minutes : -minutes;
 }
 
-// Choose the earlier instant in an overlap and move forward through a DST gap.
 export function zonedTimestamp(date: string, minute: number, zone: string) {
   const wall = Date.parse(date) + minute * MINUTE;
   const target = new Date(wall).toISOString().slice(0, 16);

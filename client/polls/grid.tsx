@@ -62,16 +62,15 @@ export function Grid({ model, mode, scrollRef, onScroll }: {
         <span className="border-r border-[#d3d3d3]" />
         {days.map(day => <div key={day.date} className="flex h-10 flex-col items-center justify-center border-r border-[#d3d3d3] text-center leading-tight"><span className="text-[10px]">{formatInZone(day.first, zone, { month: "short", day: "numeric" }, "en-US")}</span><span className="text-sm">{formatInZone(day.first, zone, { weekday: "short" }, "en-US")}</span></div>)}
       </div>
-      {times.map((time, row) => {
-        const [hour, minute, occurrence] = time.split(":").map(Number);
-        const previous = times[row - 1]?.split(":").map(Number);
-        const gap = previous ? hour * 60 + minute - (previous[0] * 60 + previous[1]) : 0;
+      {times.map(({ key, hour, minute, occurrence }, row) => {
+        const previous = times[row - 1];
+        const gap = previous ? hour * 60 + minute - (previous.hour * 60 + previous.minute) : 0;
         const showTime = row === 0 || minute === 0 || occurrence > 0 || gap > SLOT_MINUTES;
         const label = `${hour % 12 || 12} ${hour < 12 ? "am" : "pm"}`;
-        return <div key={time} className="grid" style={{ gridTemplateColumns: columns }}>
+        return <div key={key} className="grid" style={{ gridTemplateColumns: columns }}>
           <span className={"h-6 border-t border-r border-[#d3d3d3] pr-1 text-right text-[11px] leading-6 text-slate-600 sm:h-[15px] sm:leading-[15px] " + (showTime ? "border-t-[#aab9c9]" : "border-t-[#e3e9f0]")}>{showTime ? label : ""}</span>
           {days.map(day => {
-          const slot = day.byTime.get(time);
+          const slot = day.byTime.get(key);
           if (!slot) return <span key={day.date} className="h-6 border-t border-r border-[#e3e9f0] bg-[#f7f9fc] sm:h-[15px]" />;
           const index = slot.index;
           const count = counts?.[index] || 0;

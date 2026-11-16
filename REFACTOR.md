@@ -132,3 +132,15 @@ Resume with:
 4. Repeat independent reviews after fixes until no worthwhile issues remain.
 
 This refactor is unfinished and has not been deployed.
+
+## Resumed review
+
+The user resumed work on November 16. The branch was clean and PR #4 remained a
+draft. Maintained pure behavioral checks and real Lakebed guest/reactive-query
+checks now pass. The resumed independent structural review found two remaining
+links before their fixes:
+
+- Use one planner palette for timeline cells and legend swatches, including the
+  selected-range fill. Those colors currently have independent definitions.
+- Return typed time-row metadata from grid projection. The renderer currently
+  parses the model's opaque row-key encoding to recover display information.

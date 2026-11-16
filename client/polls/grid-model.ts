@@ -3,10 +3,11 @@ import { SLOT_MINUTES, parseDates, parseSlots, slotsPerDay } from "../../shared/
 import type { PollSchedule } from "../../shared/polls";
 
 type Slot = { index: number; ts: number };
+type TimeRow = { key: string; hour: number; minute: number; occurrence: number };
 export type GridModel = {
   zone: string;
   days: { date: string; first: number; byTime: Map<string, Slot> }[];
-  times: string[];
+  times: TimeRow[];
   slotCount: number;
 };
 
@@ -24,6 +25,7 @@ export function buildGrid(poll: PollSchedule, zone: string): GridModel {
     items.push(slot);
     byDate.set(date, items);
   }
+  const rows = new Map<string, TimeRow>();
   const days = [...byDate.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => {
     const occurrences = new Map<string, number>();
     const byTime = new Map<string, Slot>();
@@ -31,11 +33,15 @@ export function buildGrid(poll: PollSchedule, zone: string): GridModel {
       const time = localParts(slot.ts, zone).slice(11);
       const occurrence = occurrences.get(time) || 0;
       occurrences.set(time, occurrence + 1);
-      byTime.set(`${time}:${occurrence}`, slot);
+      const key = `${time}:${occurrence}`;
+      const [hour, minute] = time.split(":").map(Number);
+      rows.set(key, { key, hour, minute, occurrence });
+      byTime.set(key, slot);
     }
     return { date, first: items[0].ts, byTime };
   });
-  return { zone, days, times: [...new Set(days.flatMap(day => [...day.byTime.keys()]))].sort(), slotCount: slots.length };
+  const times = [...rows.values()].sort((a, b) => a.hour - b.hour || a.minute - b.minute || a.occurrence - b.occurrence);
+  return { zone, days, times, slotCount: slots.length };
 }
 
 export function groupAvailability(responses: { name: string; slots: string }[], slotCount: number) {

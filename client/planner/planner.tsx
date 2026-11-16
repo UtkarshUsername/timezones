@@ -12,6 +12,12 @@ const CELL_GAP = 3;
 const STRIP_W = HOURS * (CELL_W + CELL_GAP);
 const NOW_COLOR = "#52b306";
 const SEL_COLOR = "#1498e0";
+const SELECTED_FILL = "rgba(20, 152, 224, 0.10)";
+const TONES = {
+  day: { label: "Daytime", background: "bg-[#dbe8f8]", text: "text-black", border: "border-[#b9cfe8]" },
+  mid: { label: "Morning / evening", background: "bg-[#8fb0c7]", text: "text-black", border: "border-[#7ba0b8]" },
+  night: { label: "Night", background: "bg-[#2e4a5a]", text: "text-white", border: "border-[#22394a]" },
+};
 
 function cellTone(hour: number): "day" | "mid" | "night" {
   if (hour >= 8 && hour <= 21) return "day";
@@ -132,7 +138,7 @@ export function PlannerApp() {
       <div
         key={key}
         className="pointer-events-none absolute bottom-0 top-0 z-10 rounded"
-        style={{ left: `calc(var(--zone-width) + ${l}px)`, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: "rgba(20, 152, 224, 0.10)" }}
+        style={{ left: `calc(var(--zone-width) + ${l}px)`, width: Math.max(r - l, 10), border: `3px solid ${color}`, background: SELECTED_FILL }}
       />
     );
   }
@@ -244,14 +250,14 @@ export function PlannerApp() {
                           const cellHour = hour12 ? digits : formatInZone(ts, zone, { hour: "2-digit", hourCycle: "h23" });
                           const cellMins = formatInZone(ts, zone, { minute: "2-digit" }).padStart(2, "0");
                           const spansMidnight = dateInput(ts - 1, zone) !== dateInput(ts + 3599_999, zone);
-                          const bg = tone === "day" ? "bg-[#dbe8f8] text-black" : tone === "mid" ? "bg-[#8fb0c7] text-black" : "bg-[#2e4a5a] text-white";
-                          const border = tone === "day" ? "border-[#b9cfe8]" : tone === "mid" ? "border-[#7ba0b8]" : "border-[#22394a]";
+                          const palette = TONES[tone];
+                          const fill = spansMidnight ? TONES.night : palette;
                           const wd = formatInZone(ts + 3599_999, zone, { weekday: "short" }).toUpperCase();
                           const dm = formatInZone(ts + 3599_999, zone, { day: "numeric", month: "short" }).toUpperCase();
                           return (
                             <button key={ts} type="button" aria-label={`${dateInput(ts, zone)} ${timeInput(ts, zone)} ${gmtLabel(ts, zone)} in ${shortZone(zone)}`}
                               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (e.shiftKey) selectRange(selectedRange.start, ts + 3600_000, zone); else selectHour(ts, zone); } }}
-                              className={`flex shrink-0 flex-col items-center justify-center rounded border ${border} ${spansMidnight ? "bg-[#2e4a5a] text-white" : bg} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`} style={{ width: CELL_W, height: 64 }}>
+                              className={`flex shrink-0 flex-col items-center justify-center rounded border ${palette.border} ${fill.background} ${fill.text} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500`} style={{ width: CELL_W, height: 64 }}>
                               {spansMidnight ? <><span className="text-[15px] font-bold">{wd}</span><span className="text-[9px]">{dm}</span></> : <><span className="text-[17px] leading-none">{cellHour}{cellMins !== "00" ? <span className="ml-0.5 align-top text-[10px]">{cellMins}</span> : null}</span>
                               {hour12 ? <span className="pt-0.5 text-[11px] lowercase">{ampm}</span> : null}</>}
                             </button>
@@ -271,10 +277,8 @@ export function PlannerApp() {
         <p className={`mt-2 text-sm sm:hidden ${dark ? "text-slate-300" : "text-slate-600"}`}>Scroll the timeline to see more hours →</p>
         <div className={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>
           <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm bg-white" style={{ border: `2px solid ${NOW_COLOR}` }} />Now</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm" style={{ border: `2px solid ${SEL_COLOR}`, background: "rgba(20, 152, 224, 0.10)" }} />Selected</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#b9cfe8] bg-[#dbe8f8]" />Daytime</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#7ba0b8] bg-[#8fb0c7]" />Morning / evening</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm border border-[#22394a] bg-[#2e4a5a]" />Night</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-4 w-4 rounded-sm" style={{ border: `2px solid ${SEL_COLOR}`, background: SELECTED_FILL }} />Selected</span>
+          {Object.values(TONES).map(tone => <span key={tone.label} className="flex items-center gap-1.5"><span className={`inline-block h-4 w-4 rounded-sm border ${tone.border} ${tone.background}`} />{tone.label}</span>)}
         </div>
         {planner.zones.some((z) => z !== planner.sourceZone) ? <p className={`mt-3 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>
           In other zones: {planner.zones.filter((z) => z !== planner.sourceZone).map((z) => `${fmtTime(selectedRange.start, z, hour12)} ${shortZone(z)}`).join(" · ")}
