@@ -1,3 +1,5 @@
+import { canonZone, formatter, offsetMinutes } from "../shared/time";
+
 export const zoneOptions = [
   "Pacific/Midway", "Pacific/Honolulu", "America/Anchorage", "America/Los_Angeles",
   "America/Denver", "America/Chicago", "America/New_York", "America/Halifax",
@@ -14,23 +16,9 @@ export function shortZone(zone: string) {
   return zone.split("/").at(-1)?.replaceAll("_", " ") || zone;
 }
 
-export function canonZone(zone: string) { return zone === "Asia/Calcutta" ? "Asia/Kolkata" : zone; }
-
 export function zoneCode(ts: number, zone: string) {
-  if (zone === "Asia/Kolkata" || zone === "Asia/Calcutta") return "IST";
-  try {
-    return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value || "GMT";
-  } catch { return "GMT"; }
-}
-
-export function offsetMinutes(ts: number, zone: string) {
-  try {
-    const part = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value || "GMT";
-    const m = part.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!m) return 0;
-    const mins = Number(m[2]) * 60 + Number(m[3] || 0);
-    return m[1] === "+" ? mins : -mins;
-  } catch { return 0; }
+  if (canonZone(zone) === "Asia/Kolkata") return "IST";
+  return formatter(zone, { timeZoneName: "short" }, "en-US").formatToParts(ts).find(i => i.type === "timeZoneName")!.value;
 }
 
 export function gmtLabel(ts: number, zone: string) {
@@ -44,10 +32,8 @@ export function gmtLabel(ts: number, zone: string) {
 }
 
 export function fullName(zone: string, ts: number) {
-  try {
-    const long = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "long" }).formatToParts(ts).find((i) => i.type === "timeZoneName")?.value;
-    if (long && long !== zone) return long;
-  } catch { /* ignore */ }
+  const long = formatter(zone, { timeZoneName: "long" }, "en-US").formatToParts(ts).find(i => i.type === "timeZoneName")?.value;
+  if (long && long !== zone) return long;
   return zone.replaceAll("_", " ");
 }
 
