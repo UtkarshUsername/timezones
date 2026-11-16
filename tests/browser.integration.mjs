@@ -219,19 +219,24 @@ test("autosave serializes writes and keeps edits made before an older write comp
     });
   });
   const page = await context.newPage();
+  await page.clock.install({ time: Date.now() - 5_000 });
   const url = new URL(`/polls/${id}`, baseURL);
   url.searchParams.set("lakebed_guest", guest);
   await page.goto(url.href);
   await page.waitForFunction(() => document.querySelector('#your-availability [data-slot="0"]')?.getAttribute("aria-pressed") === "true");
+  await page.clock.pauseAt(Date.now());
   await page.locator('#your-availability [data-slot="1"]').press("Enter");
+  await page.clock.runFor(1_000);
   const abortHeld = () => held.reject(t.signal.reason);
   t.signal.addEventListener("abort", abortHeld, { once: true });
   try { await held.promise; }
   finally { t.signal.removeEventListener("abort", abortHeld); }
   await page.getByLabel("Your name").fill("Alice latest");
   await page.locator('#your-availability [data-slot="2"]').press("Enter");
+  await page.clock.runFor(1_000);
   await page.getByRole("status").filter({ hasText: /^Saving…$/ }).waitFor();
   assert.equal(writes.length, 1, "Second save must remain queued until the first completes");
+  await page.clock.resume();
   releaseFirst();
   await updates.waitFor(data => data.responses.some(response => response.name === "Alice latest" && response.slots === "[0,1,2]"));
   await page.getByRole("status").filter({ hasText: /^Saved$/ }).waitFor();

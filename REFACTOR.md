@@ -111,7 +111,7 @@ Independent final reviews identified these follow-ups before their fixes:
 - Return explicit normalized poll fields from validation. Spreading input into
   database rows forwards unknown fields that the baseline ignored.
 
-Pending: maintained behavioral tests, real Lakebed guest isolation/reactivity,
+Pending at this checkpoint: maintained behavioral tests, real Lakebed guest isolation/reactivity,
 browser behavior checks, and independent re-reviews after fixes.
 
 ## Paused for draft PR
@@ -131,7 +131,7 @@ Resume with:
    cross-device reconciliation, and last-hour viewport behavior in a browser.
 4. Repeat independent reviews after fixes until no worthwhile issues remain.
 
-This refactor is unfinished and has not been deployed.
+At this checkpoint the refactor was unfinished and had not been deployed.
 
 ## Resumed review
 
@@ -144,3 +144,48 @@ links before their fixes:
   selected-range fill. Those colors currently have independent definitions.
 - Return typed time-row metadata from grid projection. The renderer currently
   parses the model's opaque row-key encoding to recover display information.
+
+Both presentation fixes are implemented. The next independent code review found
+no worthwhile app issues. Its test review found that the autosave ordering check
+could release the first write before the second debounce fired. Use the browser
+test clock to make the second write eligible while the first remains held, and
+verify the check fails when serialization is deliberately removed.
+
+## Completed verification
+
+The two presentation findings and the test synchronization finding are resolved.
+The final independent app review found no worthwhile structural issues. The test
+review found no other worthwhile issues. The clock-driven save-ordering test
+failed at its one-write assertion when serialization was deliberately removed,
+then passed with the real queue restored. No mutation-test changes remain.
+
+Final checks:
+
+- All 18 pure behavior tests pass.
+- The live server integration check passes with fresh guest identities, including
+  private poll lists, public poll reads, owner-isolated writes, shared reactive
+  updates, same-owner sessions, and rejected-write preservation.
+- All four Chrome integration checks pass, covering legacy planner migration,
+  preferences and unavailable storage, keyboard/pointer selection, last-hour
+  viewport behavior, calendar limits, poll creation, availability painting,
+  cross-device updates, mobile grids, scroll continuity, tooltips, and serialized
+  saves with newer pending edits. No browser runtime errors were reported.
+- Strict TypeScript checking passes with zero diagnostics using the installed
+  Lakebed/Preact declarations. `npx lakebed build --json` passes.
+- All 21 app modules have resolvable relative imports and no import cycles.
+  The client-to-server dependency is type-only.
+- `git diff --check` passes. There are no disabled or skipped maintained tests.
+
+README documents module ownership and reproducible test commands. The old
+source-slicing checks were not promoted into the maintained suite. Full Google
+OAuth was not exercised; the shared guest/account slot-union behavior is tested,
+and the original identity checks and guest-upgrade transaction remain intact.
+
+Remaining special cases are requirements: external timezone aliases and IANA
+signs, DST ambiguity, legacy saved-state migration, unavailable browser storage,
+auth recovery and guest merging, autosave debounce/write ordering, distinct
+pointer/keyboard/touch interactions, repeated projected wall times, and mobile
+grid visibility/scrolling. No arbitrary readiness waits or automatic retries
+remain. No additional abstraction or file split was justified by the reviews.
+
+The refactor is complete. No deployment was performed.
